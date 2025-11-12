@@ -1,27 +1,27 @@
 #!/bin/bash
 set -e
 
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║          MTM OCR - Medya Takip Merkezi                  ║"
-echo "║          DeepSeek-OCR Docker Container                   ║"
-echo "╚══════════════════════════════════════════════════════════╝"
+echo "========================================================================"
+echo "MTM OCR - Medya Takip Merkezi"
+echo "DeepSeek-OCR Docker Container"
+echo "========================================================================"
 echo ""
 
 # CUDA kontrolü
 if command -v nvidia-smi &> /dev/null; then
-    echo "✅ NVIDIA GPU bulundu:"
+    echo "[INFO] NVIDIA GPU tespit edildi:"
     nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
 else
-    echo "⚠️  NVIDIA GPU bulunamadı! CPU modunda çalışacak (çok yavaş olabilir)"
+    echo "[WARNING] NVIDIA GPU bulunamadi! CPU modunda calisacak"
 fi
 
 echo ""
-echo "🔧 Ortam hazırlanıyor..."
+echo "[INFO] Sistem ortami hazirlaniyor..."
 
 # Python sürümü kontrolü
-echo "Python sürümü: $(python --version)"
-echo "PyTorch sürümü: $(python -c 'import torch; print(torch.__version__)')"
-echo "CUDA erişimi: $(python -c 'import torch; print("Evet (" + str(torch.version.cuda) + ")" if torch.cuda.is_available() else "Hayır")')"
+echo "       Python: $(python --version)"
+echo "       PyTorch: $(python -c 'import torch; print(torch.__version__)')"
+echo "       CUDA: $(python -c 'import torch; print("Available (" + str(torch.version.cuda) + ")" if torch.cuda.is_available() else "Not Available")')"
 
 # Gerekli dizinleri oluştur
 mkdir -p /app/uploads
@@ -30,35 +30,34 @@ mkdir -p /app/output/visualizations
 mkdir -p /app/output/images
 
 echo ""
-echo "📦 Model indiriliyor (ilk çalıştırmada birkaç dakika sürebilir)..."
-echo "   Model: deepseek-ai/DeepSeek-OCR"
+echo "[INFO] Model yuklemesi (ilk calistirmada 5-10 dakika surebilir)"
+echo "       Model: deepseek-ai/DeepSeek-OCR"
 echo ""
 
 # Model'i önceden indir (opsiyonel, hızlandırır)
 python -c "
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer
 import os
 os.environ['HF_HOME'] = '/root/.cache/huggingface'
 try:
-    print('📥 Tokenizer indiriliyor...')
+    print('[1/2] Tokenizer indiriliyor...')
     tokenizer = AutoTokenizer.from_pretrained('deepseek-ai/DeepSeek-OCR', trust_remote_code=True)
-    print('✅ Tokenizer hazır')
+    print('[2/2] Tokenizer yuklendi')
 except Exception as e:
-    print(f'⚠️  Tokenizer indirilemedi: {e}')
-    print('   Model ilk kullanımda otomatik indirilecek')
-" || echo "Model ilk kullanımda otomatik indirilecek"
+    print(f'[WARNING] Tokenizer yuklenemedi: {e}')
+    print('          Model ilk kulanimda otomatik yuklenecek')
+" || echo "[INFO] Model ilk kulanimda otomatik yuklenecek"
 
 echo ""
-echo "🚀 Uygulama başlatılıyor..."
-echo "   Web arayüzü: http://localhost:5000"
-echo "   API endpoint'leri:"
-echo "     - POST /upload - Dosya yükleme"
-echo "     - POST /process - OCR işlemi"
-echo "     - GET /results - Sonuçları listele"
-echo "     - GET /result/<id> - Tek sonuç detayı"
+echo "[INFO] Web uygulamasi baslatiliyor..."
+echo "       Web arayuzu: http://localhost:5000"
+echo "       API endpoint'leri:"
+echo "         - POST /upload     : Dosya yukleme"
+echo "         - POST /process    : OCR islemi"
+echo "         - GET  /results    : Sonuclari listele"
+echo "         - GET  /result/<id>: Tek sonuc detayi"
 echo ""
-echo "📝 Loglara devam ediliyor..."
-echo "══════════════════════════════════════════════════════════"
+echo "========================================================================"
 echo ""
 
 # Verilen komutu çalıştır

@@ -65,14 +65,20 @@ class MTMOCRProcessor:
         
         # LLM'i başlat
         print("\n" + "="*70)
-        print("🚀 DEEPSEEK OCR MODEL YÜKLENİYOR...")
+        print("DEEPSEEK OCR MODEL YUKLENIYOR")
         print("="*70)
-        print(f"📦 Model: {model_path}")
-        print(f"💾 GPU Memory: 90% kullanılacak")
-        print(f"⚡ Max Concurrent: {max_concurrency}")
-        print("\n📥 Model dosyaları indiriliyor/yükleniyor...")
-        print("   (İlk çalıştırmada ~15GB model indirilecek, 5-10 dakika sürebilir)")
-        print("   (Sonraki çalıştırmalarda cache'den yüklenecek, 30-60 saniye)\n")
+        print(f"Model: {model_path}")
+        print(f"GPU Memory Kullanimi: 90%")
+        print(f"Maksimum Eslesme: {max_concurrency}")
+        print(f"\n[1/5] Model dosyalari indiriliyor...")
+        print("      Ilk calistirmada: ~15GB model indirilecek (5-10 dakika)")
+        print("      Sonraki calistirmalarda: Cache'den yuklenecek (30-60 saniye)")
+        
+        import time
+        start_time = time.time()
+        
+        print(f"\n[2/5] vLLM engine baslatiliyor...")
+        print("      Model agirliklari GPU'ya yukleniyor...")
         
         self.llm = LLM(
             model=model_path,
@@ -87,7 +93,9 @@ class MTMOCRProcessor:
             gpu_memory_utilization=0.9,
         )
         
-        print("\n🔧 Model GPU'ya yüklendi, parametreler ayarlanıyor...")
+        elapsed = time.time() - start_time
+        print(f"\n[3/5] Model GPU'ya yuklendi ({elapsed:.1f} saniye)")
+        print("      Inference parametreleri ayarlaniyor...")
         
         # Sampling parametreleri
         logits_processors = [
@@ -105,11 +113,13 @@ class MTMOCRProcessor:
             skip_special_tokens=False,
         )
         
-        print("🖼️  Image processor hazırlanıyor...")
+        print(f"[4/5] Image processor baslatiliyor...")
         self.processor = DeepseekOCRProcessor()
         
+        total_time = time.time() - start_time
+        print(f"[5/5] Tamamlandi - Toplam sure: {total_time:.1f} saniye")
         print("\n" + "="*70)
-        print("✅ MODEL TAMAMEN HAZIR! OCR işlemleri yapılabilir.")
+        print("MODEL HAZIR - OCR islemleri yapilabilir")
         print("="*70 + "\n")
     
     def extract_word_positions(
@@ -287,7 +297,7 @@ class MTMOCRProcessor:
             }
             
         except Exception as e:
-            print(f"❌ Görsel işleme hatası ({image_path}): {e}")
+            print(f"[ERROR] Gorsel isleme hatasi ({image_path}): {e}")
             return None
     
     def process_batch(
@@ -309,13 +319,13 @@ class MTMOCRProcessor:
         Returns:
             Tüm görseller için OCR sonuçları
         """
-        print(f"\n📰 {len(image_paths)} gazete sayfası işleniyor...")
+        print(f"\n[INFO] {len(image_paths)} gazete sayfasi isleniyor...")
         
         if progress_callback:
-            progress_callback(0, len(image_paths), "Görseller hazırlanıyor...")
+            progress_callback(0, len(image_paths), "Gorseller hazirlaniyor")
         
         # Görselleri paralel olarak hazırla
-        print("🔄 Görseller hazırlanıyor...")
+        print("[1/3] Gorseller hazirlaniyor...")
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
             processed_images = list(
                 executor.map(
@@ -328,13 +338,15 @@ class MTMOCRProcessor:
         processed_images = [img for img in processed_images if img is not None]
         
         if not processed_images:
-            print("❌ İşlenecek görsel bulunamadı!")
+            print("[ERROR] Islenecek gorsel bulunamadi!")
             return []
         
+        print(f"[INFO] {len(processed_images)} gorsel hazir")
+        
         # Batch inference
-        print("🤖 OCR işlemi yapılıyor...")
+        print("[2/3] OCR islemi yapiliyor...")
         if progress_callback:
-            progress_callback(0, len(processed_images), "OCR işlemi yapılıyor...")
+            progress_callback(0, len(processed_images), "OCR islemi yapiliyor")
             
         batch_inputs = [img['cache_item'] for img in processed_images]
         
@@ -344,15 +356,15 @@ class MTMOCRProcessor:
         )
         
         # Sonuçları işle ve kaydet
-        print("💾 Sonuçlar kaydediliyor...")
+        print("[3/3] Sonuclar kaydediliyor...")
         if progress_callback:
-            progress_callback(0, len(processed_images), "Sonuçlar kaydediliyor...")
+            progress_callback(0, len(processed_images), "Sonuclar kaydediliyor")
             
         results = []
         
         for idx, (output, img_data) in enumerate(zip(outputs_list, processed_images)):
             if progress_callback:
-                progress_callback(idx + 1, len(processed_images), f"Sonuç kaydediliyor... ({idx+1}/{len(processed_images)})")
+                progress_callback(idx + 1, len(processed_images), f"Sonuc kaydediliyor ({idx+1}/{len(processed_images)})")
             try:
                 # OCR çıktısı
                 ocr_text = output.outputs[0].text

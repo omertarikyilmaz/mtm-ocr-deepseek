@@ -44,19 +44,19 @@ def get_or_create_processor():
     global ocr_processor, processing_status
     if ocr_processor is None:
         try:
-            processing_status['status_message'] = '🚀 Model yükleniyor... (ilk çalıştırmada 5-10 dakika sürebilir)'
+            processing_status['status_message'] = 'Model yukleniyor... (ilk calistirmada 5-10 dakika surebilir)'
             
             ocr_processor = MTMOCRProcessor(
                 output_dir=app.config['OUTPUT_FOLDER'],
                 max_concurrency=30
             )
             
-            processing_status['status_message'] = '✅ Model hazır!'
+            processing_status['status_message'] = 'Model hazir'
             
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            error_msg = f"❌ Model yükleme hatası: {str(e)}"
+            error_msg = f"[ERROR] Model yukleme hatasi: {str(e)}"
             print(error_msg)
             print(error_details)
             processing_status['status_message'] = error_msg
@@ -140,17 +140,17 @@ def process_images():
             processing_status['is_processing'] = True
             processing_status['total'] = len(image_paths)
             processing_status['progress'] = 0
-            processing_status['status_message'] = 'OCR işlemi başlatılıyor...'
+            processing_status['status_message'] = 'OCR islemi baslatiiliyor...'
             
-            print(f"📋 {len(image_paths)} dosya işlenecek")
+            print(f"[INFO] {len(image_paths)} dosya islenecek")
             
             # Model yükleniyor (ilk çalıştırmada)
-            processing_status['status_message'] = '📦 Model hazırlanıyor...'
+            processing_status['status_message'] = 'Model hazirlaniyor...'
             processor = get_or_create_processor()
             
             # İşleme başladı
-            processing_status['status_message'] = f'🔍 OCR işleniyor... (0/{len(image_paths)})'
-            print(f"🔍 OCR işlemi başladı: {len(image_paths)} dosya")
+            processing_status['status_message'] = f'OCR isleniyor... (0/{len(image_paths)})'
+            print(f"[INFO] OCR islemi basladi: {len(image_paths)} dosya")
             
             # Progress callback fonksiyonu
             def update_progress(current, total, message):
@@ -159,7 +159,7 @@ def process_images():
                 processing_status['status_message'] = f'{message} ({current}/{total})'
                 # Sadece önemli milestone'larda log yaz
                 if current == 0 or current == total or current % max(1, total // 10) == 0:
-                    print(f"📊 Progress: {current}/{total} - {message}")
+                    print(f"[PROGRESS] {current}/{total} - {message}")
             
             results = processor.process_batch(
                 image_paths,
@@ -167,19 +167,19 @@ def process_images():
                 progress_callback=update_progress
             )
             
-            processing_status['status_message'] = f'✅ {len(results)} sayfa başarıyla işlendi!'
+            processing_status['status_message'] = f'Basarili: {len(results)} sayfa islendi'
             processing_status['progress'] = len(results)
-            print(f"✅ İşlem tamamlandı: {len(results)} sonuç")
+            print(f"[SUCCESS] Islem tamamlandi: {len(results)} sonuc")
             
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            error_msg = f'❌ Hata: {str(e)}'
+            error_msg = f'[ERROR] Hata: {str(e)}'
             processing_status['status_message'] = error_msg
-            print(f"❌ İşlem hatası:\n{error_details}")
+            print(f"[ERROR] Islem hatasi:\n{error_details}")
         finally:
             processing_status['is_processing'] = False
-            print("🏁 İşlem tamamlandı veya sonlandı")
+            print("[INFO] Islem tamamlandi veya sonlandi")
     
     thread = threading.Thread(target=process_background)
     thread.start()
@@ -298,43 +298,43 @@ def main():
     args = parser.parse_args()
     
     print(f"""
-    ╔══════════════════════════════════════════╗
-    ║   MTM OCR - Web Arayüzü                 ║
-    ║   Medya Takip Merkezi                   ║
-    ╚══════════════════════════════════════════╝
+    ========================================================================
+    MTM OCR - Web Arayuzu
+    Medya Takip Merkezi
+    ========================================================================
     
-    🌐 URL: http://{args.host}:{args.port}
-    📁 Upload: {app.config['UPLOAD_FOLDER']}
-    📁 Output: {app.config['OUTPUT_FOLDER']}
+    URL: http://{args.host}:{args.port}
+    Upload Directory: {app.config['UPLOAD_FOLDER']}
+    Output Directory: {app.config['OUTPUT_FOLDER']}
     """)
     
     # Model'i başlangıçta yükle (kullanıcı beklemesin)
     if args.preload_model:
         print("\n" + "="*70)
-        print("⏳ MODEL ÖN YÜKLEME BAŞLIYOR...")
-        print("   (Container başlatıldığında model otomatik yüklenecek)")
-        print("   (İlk çalıştırmada ~15GB model indirilecek ve 5-10 dakika sürebilir)")
+        print("[INFO] MODEL ON YUKLEME BASLIYOR")
+        print("       Container baslatildiginda model otomatik yuklenecek")
+        print("       Ilk calistirmada: ~15GB model indirilecek (5-10 dakika)")
         print("="*70 + "\n")
         
         try:
             get_or_create_processor()
             
             print("\n" + "="*70)
-            print("✅ ÖN YÜKLEME TAMAMLANDI!")
-            print("   Kullanıcılar şimdi ANINDA OCR işlemi yapabilir.")
+            print("[SUCCESS] MODEL ON YUKLEME TAMAMLANDI")
+            print("          Kullanicilar aninda OCR islemi yapabilir")
             print("="*70 + "\n")
             
         except Exception as e:
             import traceback
             print("\n" + "="*70)
-            print(f"⚠️  MODEL ÖN YÜKLEME HATASI:")
-            print(f"   {e}")
-            print("   Model ilk kullanımda yüklenecek.")
+            print(f"[ERROR] MODEL ON YUKLEME HATASI")
+            print(f"        {e}")
+            print(f"        Model ilk kulanimda yuklenecek")
             print("="*70 + "\n")
-            print("Detaylı hata:")
+            print("Detayli hata:")
             print(traceback.format_exc())
     
-    print(f"    Tarayıcınızda açın: http://localhost:{args.port}\n")
+    print(f"\n    Web Arayuzu: http://localhost:{args.port}\n")
     
     app.run(
         host=args.host,
