@@ -267,28 +267,13 @@ def delete_result(result_id):
     """Tek bir sonucu sil"""
     try:
         results_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
-        viz_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations')
         
-        # JSON dosyasından bilgi al
+        # JSON dosyasını sil
         json_file = os.path.join(results_dir, f'{result_id}.json')
         if os.path.exists(json_file):
-            with open(json_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            # İlgili tüm dosyaları sil (TXT artık yok)
-            files_to_delete = [
-                os.path.join(results_dir, f'{result_id}.json'),
-                os.path.join(viz_dir, f"{data['image_filename']}_{data['timestamp']}_boxes.jpg")
-            ]
-            
-            deleted_count = 0
-            for file_path in files_to_delete:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    deleted_count += 1
-            
-            print(f"[INFO] Silindi: {result_id} ({deleted_count} dosya)")
-            return jsonify({'success': True, 'message': f'{deleted_count} dosya silindi'})
+            os.remove(json_file)
+            print(f"[INFO] Silindi: {result_id}")
+            return jsonify({'success': True, 'message': 'JSON dosyası silindi'})
         else:
             return jsonify({'error': 'Sonuc bulunamadi'}), 404
             
