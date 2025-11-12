@@ -107,7 +107,7 @@ pip install -r requirements.txt
 pip install flash-attn==2.7.2.post1 --no-build-isolation
 
 # 6. Web UI'ı başlat
-python web_ui.py --host 0.0.0.0 --port 5000
+python run.py --host 0.0.0.0 --port 5000
 ```
 
 ## 📖 Kullanım Kılavuzu
@@ -125,13 +125,13 @@ python web_ui.py --host 0.0.0.0 --port 5000
 
 ```bash
 # Tek klasördeki tüm görselleri işle
-python mtm_batch_ocr.py --input ./gazeteler/ --output ./sonuclar/
+python -m app.core.ocr_processor --input ./gazeteler/ --output ./sonuclar/
 
 # Belirli bir pattern ile
-python mtm_batch_ocr.py --input "./gazeteler/*.jpg" --output ./sonuclar/
+python -m app.core.ocr_processor --input "./gazeteler/*.jpg" --output ./sonuclar/
 
 # Gelişmiş parametreler
-python mtm_batch_ocr.py \
+python -m app.core.ocr_processor \
   --input ./gazeteler/ \
   --output ./sonuclar/ \
   --model deepseek-ai/DeepSeek-OCR \
@@ -143,7 +143,7 @@ python mtm_batch_ocr.py \
 ### 3. Python API ile Kullanım
 
 ```python
-from mtm_batch_ocr import MTMOCRProcessor
+from app.core import MTMOCRProcessor
 
 # Processor'ı başlat
 processor = MTMOCRProcessor(
