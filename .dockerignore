@@ -1,25 +1,45 @@
 # Git
 .git
 .gitignore
-.gitattributes
 
-# Python cache
-__pycache__
-*.pyc
-*.pyo
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+dist/
+build/
 
-# Output directories (bunlar volume olarak bağlanacak)
-models/
+# Virtual environments
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Output directories
 output/
 uploads/
-
-# Large model files (HuggingFace'den indirilecek)
-*.safetensors
-*.bin
-
-# Temporary
-*.log
-*.tmp
+models/
 
 # Documentation
-README.md
+*.md
+!README.md
+
+# Docker
+docker/
+
+# Logs
+*.log
+logs/
+
+# Temporary
+tmp/
+temp/
+*.tmp

@@ -43,6 +43,7 @@ DeepSeek-OCR tabanlı, birden fazla gazete sayfasını aynı anda işleyip **her
 cd /home/ower/Projects/mtm-ocr-deepseek
 
 # 2. Docker container'ı başlatın (ilk çalıştırmada model indirilecek, 10-15 dk sürebilir)
+cd docker
 docker-compose up -d
 
 # 3. Logları takip edin

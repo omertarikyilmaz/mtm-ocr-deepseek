@@ -13,9 +13,9 @@ from werkzeug.utils import secure_filename
 import threading
 
 # MTM Batch OCR'ı import et
-from mtm_batch_ocr import MTMOCRProcessor
+from app.core import MTMOCRProcessor
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'output'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max dosya boyutu

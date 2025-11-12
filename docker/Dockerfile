@@ -74,9 +74,8 @@ RUN pip3 install --no-cache-dir \
 RUN pip3 install --no-cache-dir flash-attn==2.7.2.post1 --no-build-isolation || echo "Flash attention kurulumu başarısız, devam ediliyor..."
 
 # Uygulama dosyaları
-COPY mtm_batch_ocr.py /app/
-COPY web_ui.py /app/
-COPY templates/ /app/templates/
+COPY app/ /app/app/
+COPY run.py /app/
 
 # Gerekli dizinler
 RUN mkdir -p /app/uploads /app/output /app/models
@@ -89,9 +88,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:5000/ || exit 1
 
 # Başlangıç scripti
-COPY docker-entrypoint.sh /app/
+COPY docker/docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["python", "web_ui.py", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["python", "/app/run.py", "--host", "0.0.0.0", "--port", "5000"]
 

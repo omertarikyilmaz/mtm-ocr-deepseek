@@ -3,8 +3,8 @@ version: '3.8'
 services:
   mtm-ocr:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     image: mtm-ocr:latest
     container_name: mtm-ocr-app
     
