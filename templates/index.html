@@ -205,12 +205,38 @@
             overflow: hidden;
             transition: all 0.3s;
             cursor: pointer;
+            position: relative;
         }
         
         .result-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             border-color: #667eea;
+        }
+        
+        .result-card-delete {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+            background: rgba(220, 53, 69, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .result-card-delete:hover {
+            background: #c82333;
+            transform: scale(1.1);
         }
         
         .result-image {
@@ -626,6 +652,7 @@
                 
                 resultsGrid.innerHTML = data.results.map(result => `
                     <div class="result-card" onclick="showResult('${result.json_file.replace('.json', '')}')">
+                        <div class="result-card-delete" onclick="event.stopPropagation(); deleteResult('${result.json_file.replace('.json', '')}')">×</div>
                         ${result.has_visualization ? 
                             `<img src="/visualization/${result.filename}_${result.timestamp}_boxes.jpg" class="result-image" alt="${result.filename}">` :
                             `<div class="result-image" style="display: flex; align-items: center; justify-content: center; font-size: 48px;">📄</div>`
@@ -642,9 +669,6 @@
                                 </button>
                                 <button class="btn btn-small" onclick="event.stopPropagation(); downloadFile('${result.json_file.replace('.json', '')}', 'txt')">
                                     TXT ⬇️
-                                </button>
-                                <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteResult('${result.json_file.replace('.json', '')}')">
-                                    🗑️
                                 </button>
                             </div>
                         </div>

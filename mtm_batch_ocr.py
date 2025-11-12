@@ -267,7 +267,7 @@ class MTMOCRProcessor:
     def process_single_image(
         self,
         image_path: str,
-        prompt: str = "<image>\n<|grounding|>Free OCR."
+        prompt: str = "<image>\n<|grounding|>Given the layout of the image. "
     ) -> Dict:
         """
         Tek bir görseli işle
@@ -311,7 +311,7 @@ class MTMOCRProcessor:
     def process_batch(
         self,
         image_paths: List[str],
-        prompt: str = "<image>\n<|grounding|>Free OCR.",
+        prompt: str = "<image>\n<|grounding|>Given the layout of the image. ",
         num_workers: int = 32,
         progress_callback: Optional[callable] = None
     ) -> List[Dict]:
