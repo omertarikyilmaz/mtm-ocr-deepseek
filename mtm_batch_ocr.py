@@ -304,7 +304,8 @@ class MTMOCRProcessor:
     def process_single_image(
         self,
         image_path: str,
-        prompt: str = "<image>\n<|grounding|>Convert the document to markdown."
+        prompt: str = "<image>\nFree OCR.",
+        use_word_location: bool = True
     ) -> Dict:
         """
         Tek bir görseli işle
@@ -345,12 +346,85 @@ class MTMOCRProcessor:
             print(f"[ERROR] Gorsel isleme hatasi ({image_path}): {e}")
             return None
     
+    def locate_words_in_image(
+        self,
+        image_path: str,
+        words: List[str],
+        batch_size: int = 10
+    ) -> Dict[str, Dict]:
+        """
+        Her kelime için locate prompt ile koordinat bul
+        kaynak.md'deki rec mode: <image>\nLocate <|ref|>xxxx<|/ref|> in the image.
+        """
+        print(f"[INFO] {len(words)} kelimenin koordinatlari araniyor...")
+        
+        word_locations = {}
+        image = Image.open(image_path).convert('RGB')
+        image_width, image_height = image.size
+        
+        # Kelimeleri batch'lere böl (her seferinde batch_size kelime)
+        for i in range(0, len(words), batch_size):
+            batch_words = words[i:i+batch_size]
+            print(f"[INFO] Batch {i//batch_size + 1}/{(len(words) + batch_size - 1)//batch_size}: {len(batch_words)} kelime")
+            
+            for word in batch_words:
+                try:
+                    # Locate prompt (kaynak.md satır 35)
+                    locate_prompt = f"<image>\nLocate <|ref|>{word}<|/ref|> in the image."
+                    
+                    # Process image with locate prompt
+                    cache_item = {
+                        "prompt": locate_prompt,
+                        "multi_modal_data": {
+                            "image": self.processor.tokenize_with_images(
+                                images=[image],
+                                bos=True,
+                                eos=True,
+                                cropping=self.crop_mode
+                            )
+                        },
+                    }
+                    
+                    # Generate
+                    output = self.llm.generate([cache_item], sampling_params=self.sampling_params)[0]
+                    response = output.outputs[0].text
+                    
+                    # Parse koordinat
+                    pattern = r'<\|det\|>(.*?)<\|/det\|>'
+                    coords_match = re.search(pattern, response)
+                    
+                    if coords_match:
+                        coords_str = coords_match.group(1)
+                        coords = eval(coords_str)
+                        
+                        if isinstance(coords, list) and len(coords) > 0:
+                            bbox = coords[0] if isinstance(coords[0], list) else coords
+                            if len(bbox) >= 4:
+                                x1 = int(bbox[0] / 999 * image_width)
+                                y1 = int(bbox[1] / 999 * image_height)
+                                x2 = int(bbox[2] / 999 * image_width)
+                                y2 = int(bbox[3] / 999 * image_height)
+                                
+                                word_locations[word] = {
+                                    'bbox': {
+                                        'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
+                                        'width': x2 - x1, 'height': y2 - y1
+                                    }
+                                }
+                except Exception as e:
+                    print(f"[WARNING] '{word}' kelimesi icin koordinat bulunamadi: {e}")
+                    continue
+        
+        print(f"[SUCCESS] {len(word_locations)}/{len(words)} kelimenin koordinati bulundu")
+        return word_locations
+    
     def process_batch(
         self,
         image_paths: List[str],
-        prompt: str = "<image>\n<|grounding|>Convert the document to markdown.",
+        prompt: str = "<image>\nFree OCR.",
         num_workers: int = 32,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[callable] = None,
+        use_word_location: bool = True
     ) -> List[Dict]:
         """
         Birden fazla görseli batch olarak işle
@@ -428,10 +502,35 @@ class MTMOCRProcessor:
                 # Temiz metni çıkart
                 clean_text = self.extract_text_only(ocr_text)
                 
-                # Debug: OCR output uzunluğunu kontrol et
                 print(f"[DEBUG] OCR output length: {len(ocr_text)} characters")
-                print(f"[DEBUG] Word positions: {len(word_positions)}")
+                print(f"[DEBUG] Word positions from grounding: {len(word_positions)}")
                 print(f"[DEBUG] Clean text length: {len(clean_text)} characters")
+                
+                # YENI STRATEJI: Free OCR ile metin aldık, şimdi her kelime için locate
+                if use_word_location and len(word_positions) < 20:  # Eğer az kelime varsa (paragraf seviyesi)
+                    print(f"[INFO] Grounding yetersiz ({len(word_positions)} item), LOCATE modu baslatiliyor...")
+                    
+                    # Metinden kelimeleri ayır
+                    words = clean_text.split()
+                    words = [w.strip('.,!?;:()[]{}\"\'') for w in words if len(w.strip('.,!?;:()[]{}\"\'')) > 0]
+                    words = list(set(words))  # Tekrarları kaldır
+                    
+                    print(f"[INFO] {len(words)} benzersiz kelime bulundu")
+                    
+                    # Her kelime için koordinat bul
+                    word_locations = self.locate_words_in_image(img_data['image_path'], words, batch_size=5)
+                    
+                    # word_positions array'ini oluştur
+                    word_positions = []
+                    for word_text in words:
+                        if word_text in word_locations:
+                            word_positions.append({
+                                'text': word_text,
+                                'bbox': word_locations[word_text]['bbox'],
+                                'index': len(word_positions)
+                            })
+                    
+                    print(f"[SUCCESS] LOCATE ile {len(word_positions)} kelimenin koordinati alindi!")
                 
                 # JSON sonuç
                 result_data = {
