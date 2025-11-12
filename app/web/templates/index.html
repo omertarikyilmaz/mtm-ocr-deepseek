@@ -943,6 +943,12 @@
                 return;
             }
             
+            // Clear previous results and cache
+            window.currentSearchResults = null;
+            window.currentHighlightedCanvas = null;
+            searchResultsContainer.innerHTML = '';
+            searchResults.style.display = 'none';
+            
             // Disable button
             searchBtn.disabled = true;
             searchBtn.textContent = '🔍 Aranıyor...';
@@ -1118,6 +1124,7 @@
             
             console.log('[DEBUG] Canvas çizimi başlıyor...');
             console.log('[DEBUG] Image base64 length:', result.image_base64 ? result.image_base64.length : 0);
+            console.log('[DEBUG] Orijinal görsel boyutu (JSON):', result.image_size);
             
             // Load image from base64
             const img = new Image();
@@ -1130,18 +1137,22 @@
             };
             
             img.onload = function() {
-                console.log('[DEBUG] Görsel yüklendi:', img.width, 'x', img.height);
+                console.log('[DEBUG] Görsel yüklendi - Gerçek boyut:', img.width, 'x', img.height);
                 
                 try {
-                    // Set canvas size
+                    // Canvas boyutunu ayarla
                     const maxWidth = 1100;
-                    const scale = Math.min(1, maxWidth / img.width);
-                    canvas.width = img.width * scale;
-                    canvas.height = img.height * scale;
+                    const scaleX = maxWidth / result.image_size.width;
+                    const scaleY = maxWidth / result.image_size.height;
+                    const scale = Math.min(scaleX, scaleY, 1); // En küçük scale veya 1
                     
+                    canvas.width = result.image_size.width * scale;
+                    canvas.height = result.image_size.height * scale;
+                    
+                    console.log('[DEBUG] Scale faktörü:', scale);
                     console.log('[DEBUG] Canvas boyutu:', canvas.width, 'x', canvas.height);
                     
-                    // Draw image
+                    // Görseli çiz
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     
                     // Generate colors for each keyword
@@ -1159,42 +1170,28 @@
                         console.log(`[DEBUG] Kelime: "${match.keyword}", Eşleşme sayısı: ${match.positions.length}`);
                         
                         match.positions.forEach((pos, posIdx) => {
-                            // JSON'da iki tür bbox var:
-                            // 1. bbox: Pixel cinsinden (orijinal görsel boyutunda)
-                            // 2. normalized_bbox: 0-999 arası normalize edilmiş
-                            
-                            // Normalized bbox kullan (daha güvenilir)
-                            const normalizedBbox = pos.normalized_bbox || pos.bbox;
+                            // Backend bbox'u zaten pixel cinsinden veriyor (orijinal görsel boyutunda)
+                            // Bu bbox'ları canvas scale'ine göre çevirmeliyiz
                             const bbox = pos.bbox;
                             
-                            console.log(`  [${posIdx}] text: "${pos.text}"`);
-                            console.log(`  [${posIdx}] normalized_bbox:`, normalizedBbox);
-                            console.log(`  [${posIdx}] bbox (pixel):`, bbox);
-                            
-                            // Normalized bbox varsa onu kullan (0-999 -> canvas boyutuna çevir)
-                            let x1, y1, x2, y2, width, height;
-                            
-                            if (normalizedBbox && normalizedBbox.x1 !== undefined) {
-                                // Normalized koordinatları (0-999) canvas boyutuna çevir
-                                x1 = (normalizedBbox.x1 / 999) * canvas.width;
-                                y1 = (normalizedBbox.y1 / 999) * canvas.height;
-                                x2 = (normalizedBbox.x2 / 999) * canvas.width;
-                                y2 = (normalizedBbox.y2 / 999) * canvas.height;
-                                width = x2 - x1;
-                                height = y2 - y1;
-                                console.log(`  [${posIdx}] NORMALIZED kullanıldı`);
-                            } else {
-                                // Pixel bbox'ı scale ile çevir
-                                x1 = bbox.x1 * scale;
-                                y1 = bbox.y1 * scale;
-                                x2 = bbox.x2 * scale;
-                                y2 = bbox.y2 * scale;
-                                width = x2 - x1;
-                                height = y2 - y1;
-                                console.log(`  [${posIdx}] PIXEL bbox kullanıldı`);
+                            if (!bbox || bbox.x1 === undefined) {
+                                console.warn(`  [${posIdx}] Bbox bulunamadı, atlandı`);
+                                return;
                             }
                             
-                            console.log(`  [${posIdx}] Çizilen kutu: x=${Math.round(x1)}, y=${Math.round(y1)}, w=${Math.round(width)}, h=${Math.round(height)}`);
+                            // Pixel koordinatları scale ile canvas boyutuna çevir
+                            const x1 = bbox.x1 * scale;
+                            const y1 = bbox.y1 * scale;
+                            const x2 = bbox.x2 * scale;
+                            const y2 = bbox.y2 * scale;
+                            const width = x2 - x1;
+                            const height = y2 - y1;
+                            
+                            if (posIdx < 3) { // İlk 3 kutu için debug
+                                console.log(`  [${posIdx}] "${pos.text}"`);
+                                console.log(`    Orijinal bbox:`, bbox);
+                                console.log(`    Scale sonrası: x=${Math.round(x1)}, y=${Math.round(y1)}, w=${Math.round(width)}, h=${Math.round(height)}`);
+                            }
                             
                             // Geçersiz boyutları atla
                             if (width <= 0 || height <= 0) {
