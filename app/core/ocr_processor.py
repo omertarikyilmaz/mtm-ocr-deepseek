@@ -8,6 +8,7 @@ import os
 import re
 import json
 import glob
+import base64
 from typing import List, Dict, Tuple, Optional
 from pathlib import Path
 from datetime import datetime
@@ -462,6 +463,15 @@ class MTMOCRProcessor:
                 # Temiz metni çıkart
                 clean_text = self.extract_text_only(ocr_text)
                 
+                # Görseli base64 olarak oku
+                image_base64 = None
+                try:
+                    with open(img_data['image_path'], 'rb') as img_file:
+                        image_data = img_file.read()
+                        image_base64 = base64.b64encode(image_data).decode('utf-8')
+                except Exception as e:
+                    print(f"[UYARI] Gorsel base64'e cevrilemedi: {e}")
+                
                 if use_word_location and len(word_positions) < 20:
                     all_words = clean_text.split()
                     all_words = [w.strip('.,!?;:()[]{}\"\'') for w in all_words if len(w.strip('.,!?;:()[]{}\"\'')) > 0]
@@ -486,10 +496,10 @@ class MTMOCRProcessor:
                 
                 # JSON sonuç
                 result_data = {
-                    'image_id': image_id,  # Benzersiz ID (dosya adı = {id}.jpg)
-                    'image_filename': image_filename,  # {id}.jpg
-                    'image_path': original_saved_path,  # Originals klasöründeki yol (kalıcı)
-                    'original_upload_path': img_data['image_path'],  # Orijinal upload yolu (referans için)
+                    'image_id': image_id,
+                    'image_filename': image_filename,
+                    'image_path': original_saved_path,
+                    'original_upload_path': img_data['image_path'],
                     'timestamp': timestamp,
                     'image_size': {
                         'width': img_data['width'],
@@ -498,14 +508,16 @@ class MTMOCRProcessor:
                     'word_count': len(word_positions),
                     'words': word_positions,
                     'full_text': clean_text,
-                    'raw_ocr_output': ocr_text
+                    'raw_ocr_output': ocr_text,
+                    'image_base64': image_base64
                 }
                 
-                # JSON dosyasını kaydet
+                # JSON dosyasını kaydet (result_id ile)
+                json_filename = f'{image_id}.json'
                 json_path = os.path.join(
                     self.output_dir,
                     'results',
-                    f'{image_filename}_{timestamp}.json'
+                    json_filename
                 )
                 with open(json_path, 'w', encoding='utf-8') as f:
                     json.dump(result_data, f, ensure_ascii=False, indent=2)

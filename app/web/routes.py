@@ -205,12 +205,13 @@ def list_results():
             with open(json_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 
+                result_id = Path(json_file).stem
                 results.append({
-                    'id': Path(json_file).stem,
+                    'id': result_id,
                     'filename': data['image_filename'],
                     'timestamp': data['timestamp'],
                     'word_count': data['word_count'],
-                    'json_file': os.path.basename(json_file)
+                    'json_file': f'{result_id}.json'
                 })
         except Exception as e:
             print(f"Error reading {json_file}: {e}")
