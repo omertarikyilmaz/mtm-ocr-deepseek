@@ -1,4 +1,4 @@
-# 📁 Proje Yapısı
+# Proje Yapısı
 
 ```
 mtm-ocr-deepseek/
@@ -28,7 +28,7 @@ mtm-ocr-deepseek/
 └── PROJECT_STRUCTURE.md        # Bu dosya
 ```
 
-## 📦 Modüller
+## Modüller
 
 ### `app/core/`
 OCR işleme mantığı. DeepSeek-OCR modelini kullanarak görselleri işler.
@@ -39,7 +39,7 @@ Flask web uygulaması. REST API endpoint'leri ve HTML arayüzü.
 ### `docker/`
 Docker container yapılandırması. GPU desteği ile çalışır.
 
-## 🚀 Çalıştırma
+## Çalıştırma
 
 ### Docker ile (Önerilen)
 ```bash

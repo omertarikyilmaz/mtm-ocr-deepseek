@@ -333,15 +333,13 @@ Test ortamı: NVIDIA A100 40GB
 * Dinamik kırpma modu (Gundam) ile
 * MAX_CONCURRENCY=50 ile
 
-## 🤝 Katkıda Bulunma
+## Katkıda Bulunma
 
 Bu proje Medya Takip Merkezi için özel olarak geliştirilmiştir.
 
 ## Lisans
 
 Bu proje DeepSeek-OCR'nin lisansına tabidir.
-
-## 🙏 Teşekkürler
 
 - [DeepSeek-AI](https://github.com/deepseek-ai) - DeepSeek-OCR modeli
 - [vLLM](https://github.com/vllm-project/vllm) - Hızlı inference
