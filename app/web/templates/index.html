@@ -1159,20 +1159,42 @@
                         console.log(`[DEBUG] Kelime: "${match.keyword}", Eşleşme sayısı: ${match.positions.length}`);
                         
                         match.positions.forEach((pos, posIdx) => {
+                            // JSON'da iki tür bbox var:
+                            // 1. bbox: Pixel cinsinden (orijinal görsel boyutunda)
+                            // 2. normalized_bbox: 0-999 arası normalize edilmiş
+                            
+                            // Normalized bbox kullan (daha güvenilir)
+                            const normalizedBbox = pos.normalized_bbox || pos.bbox;
                             const bbox = pos.bbox;
                             
-                            // Debug: bbox değerlerini kontrol et
-                            console.log(`  [${posIdx}] bbox:`, bbox);
+                            console.log(`  [${posIdx}] text: "${pos.text}"`);
+                            console.log(`  [${posIdx}] normalized_bbox:`, normalizedBbox);
+                            console.log(`  [${posIdx}] bbox (pixel):`, bbox);
                             
-                            // Koordinatları hesapla
-                            const x1 = bbox.x1 * scale;
-                            const y1 = bbox.y1 * scale;
-                            const x2 = bbox.x2 * scale;
-                            const y2 = bbox.y2 * scale;
-                            const width = x2 - x1;
-                            const height = y2 - y1;
+                            // Normalized bbox varsa onu kullan (0-999 -> canvas boyutuna çevir)
+                            let x1, y1, x2, y2, width, height;
                             
-                            console.log(`  [${posIdx}] Çizilen kutu: x=${x1}, y=${y1}, w=${width}, h=${height}`);
+                            if (normalizedBbox && normalizedBbox.x1 !== undefined) {
+                                // Normalized koordinatları (0-999) canvas boyutuna çevir
+                                x1 = (normalizedBbox.x1 / 999) * canvas.width;
+                                y1 = (normalizedBbox.y1 / 999) * canvas.height;
+                                x2 = (normalizedBbox.x2 / 999) * canvas.width;
+                                y2 = (normalizedBbox.y2 / 999) * canvas.height;
+                                width = x2 - x1;
+                                height = y2 - y1;
+                                console.log(`  [${posIdx}] NORMALIZED kullanıldı`);
+                            } else {
+                                // Pixel bbox'ı scale ile çevir
+                                x1 = bbox.x1 * scale;
+                                y1 = bbox.y1 * scale;
+                                x2 = bbox.x2 * scale;
+                                y2 = bbox.y2 * scale;
+                                width = x2 - x1;
+                                height = y2 - y1;
+                                console.log(`  [${posIdx}] PIXEL bbox kullanıldı`);
+                            }
+                            
+                            console.log(`  [${posIdx}] Çizilen kutu: x=${Math.round(x1)}, y=${Math.round(y1)}, w=${Math.round(width)}, h=${Math.round(height)}`);
                             
                             // Geçersiz boyutları atla
                             if (width <= 0 || height <= 0) {
