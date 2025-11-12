@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  mtm-ocr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mtm-ocr:latest
+    container_name: mtm-ocr-app
+    
+    # GPU erişimi (NVIDIA Docker runtime gerekli)
+    runtime: nvidia
+    
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
+      - VLLM_USE_V1=0
+      
+    ports:
+      - "5000:5000"
+    
+    volumes:
+      # Model önbelleği için (HuggingFace modelleri)
+      - ./models:/root/.cache/huggingface
+      
+      # Çıktı dosyaları için
+      - ./output:/app/output
+      
+      # Upload dosyaları için
+      - ./uploads:/app/uploads
+      
+      # (Opsiyonel) Yerel model kullanmak için
+      # - /path/to/your/model:/app/local-model:ro
+    
+    # Bellek limitleri (isteğe göre ayarlayın)
+    shm_size: '8gb'
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Sağlık kontrolü
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+# Kullanım:
+# 1. İlk çalıştırma (build ve start):
+#    docker-compose up -d
+#
+# 2. Logları görüntüleme:
+#    docker-compose logs -f
+#
+# 3. Durdurma:
+#    docker-compose down
+#
+# 4. Yeniden build:
+#    docker-compose build --no-cache
+#
+# 5. Container'a giriş:
+#    docker-compose exec mtm-ocr bash
+

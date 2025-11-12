@@ -1,0 +1,45 @@
+# MTM OCR - Python Bağımlılıkları
+
+# PyTorch (CUDA 11.8)
+# Kurulum için:
+# pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu118
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+
+# vLLM
+# Kurulum için:
+# pip install vllm==0.8.5+cu118 --extra-index-url https://wheels.vllm.ai/nightly
+vllm==0.8.5+cu118
+
+# Transformers ve Tokenizers
+transformers==4.46.3
+tokenizers==0.20.3
+
+# PDF ve Image işleme
+PyMuPDF
+img2pdf
+Pillow>=9.0.0
+
+# Deep Learning utilities
+einops
+easydict
+addict
+
+# Numpy
+numpy>=1.21.0
+
+# Web Framework
+flask>=2.0.0
+flask-cors>=3.0.0
+
+# Progress bars
+tqdm>=4.62.0
+
+# Flash Attention (Opsiyonel - performans için)
+# pip install flash-attn==2.7.3 --no-build-isolation
+# flash-attn==2.7.3
+
+# CUDA Toolkit gereksinimi: 11.8
+# NVIDIA Driver gereksinimi: >= 520.61.05
+

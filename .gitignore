@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+dist/
+build/
+
+# Model files
+models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Output directories
+output/
+uploads/
+results/
+visualizations/
+
+# Cache
+.cache/
+*.cache
+.huggingface/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+.dockerignore
+
+# Environment
+.env
+.env.local
+

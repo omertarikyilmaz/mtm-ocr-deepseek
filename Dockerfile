@@ -1,0 +1,87 @@
+# MTM OCR - Medya Takip Merkezi
+# Docker image for DeepSeek-OCR with Web UI
+
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+
+# Temel paketler
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    git \
+    wget \
+    curl \
+    vim \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python sembolik bağlantı
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+# Çalışma dizini
+WORKDIR /app
+
+# CUDA ortam değişkenleri
+ENV CUDA_HOME=/usr/local/cuda-11.8
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+ENV TRITON_PTXAS_PATH=/usr/local/cuda-11.8/bin/ptxas
+
+# Python bağımlılıkları - önce temel paketler
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+
+# PyTorch ve torchvision (CUDA 11.8 için)
+RUN pip3 install --no-cache-dir \
+    torch==2.6.0 \
+    torchvision==0.21.0 \
+    torchaudio==2.6.0 \
+    --index-url https://download.pytorch.org/whl/cu118
+
+# DeepSeek OCR kodu
+COPY DeepSeek-OCR/ /app/DeepSeek-OCR/
+
+# vLLM kurulumu
+RUN pip3 install --no-cache-dir \
+    vllm==0.8.5+cu118 \
+    --extra-index-url https://wheels.vllm.ai/nightly
+
+# Diğer bağımlılıklar
+RUN pip3 install --no-cache-dir \
+    transformers==4.46.3 \
+    tokenizers==0.20.3 \
+    PyMuPDF \
+    img2pdf \
+    einops \
+    easydict \
+    addict \
+    Pillow \
+    numpy \
+    flask \
+    tqdm
+
+# Flash Attention (opsiyonel, hızlandırır)
+RUN pip3 install --no-cache-dir flash-attn==2.7.3 --no-build-isolation || echo "Flash attention kurulumu başarısız, devam ediliyor..."
+
+# Uygulama dosyaları
+COPY mtm_batch_ocr.py /app/
+COPY web_ui.py /app/
+COPY templates/ /app/templates/
+
+# Gerekli dizinler
+RUN mkdir -p /app/uploads /app/output /app/models
+
+# Port
+EXPOSE 5000
+
+# Sağlık kontrolü
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5000/ || exit 1
+
+# Başlangıç scripti
+COPY docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["python", "web_ui.py", "--host", "0.0.0.0", "--port", "5000"]
+
