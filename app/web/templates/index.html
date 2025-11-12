@@ -1153,24 +1153,46 @@
                     
                     // Draw rectangles for each match
                     let totalBoxes = 0;
-                    result.matches.forEach(match => {
+                    result.matches.forEach((match, matchIdx) => {
                         const color = keywordColors[match.keyword];
                         
-                        match.positions.forEach(pos => {
+                        console.log(`[DEBUG] Kelime: "${match.keyword}", Eşleşme sayısı: ${match.positions.length}`);
+                        
+                        match.positions.forEach((pos, posIdx) => {
                             const bbox = pos.bbox;
-                            const x = bbox.x1 * scale;
-                            const y = bbox.y1 * scale;
-                            const width = bbox.width * scale;
-                            const height = bbox.height * scale;
+                            
+                            // Debug: bbox değerlerini kontrol et
+                            console.log(`  [${posIdx}] bbox:`, bbox);
+                            
+                            // Koordinatları hesapla
+                            const x1 = bbox.x1 * scale;
+                            const y1 = bbox.y1 * scale;
+                            const x2 = bbox.x2 * scale;
+                            const y2 = bbox.y2 * scale;
+                            const width = x2 - x1;
+                            const height = y2 - y1;
+                            
+                            console.log(`  [${posIdx}] Çizilen kutu: x=${x1}, y=${y1}, w=${width}, h=${height}`);
+                            
+                            // Geçersiz boyutları atla
+                            if (width <= 0 || height <= 0) {
+                                console.warn(`  [${posIdx}] Geçersiz kutu boyutu, atlandı`);
+                                return;
+                            }
+                            
+                            // Eğer kutu çok büyükse uyar
+                            if (width > canvas.width * 0.8 || height > canvas.height * 0.8) {
+                                console.warn(`  [${posIdx}] Kutu çok büyük! (${width}x${height}), canvas: (${canvas.width}x${canvas.height})`);
+                            }
                             
                             // Draw thick rectangle border
                             ctx.strokeStyle = color;
                             ctx.lineWidth = 4;
-                            ctx.strokeRect(x, y, width, height);
+                            ctx.strokeRect(x1, y1, width, height);
                             
                             // Draw semi-transparent fill
                             ctx.fillStyle = color.replace(')', ', 0.2)').replace('hsl', 'hsla');
-                            ctx.fillRect(x, y, width, height);
+                            ctx.fillRect(x1, y1, width, height);
                             
                             totalBoxes++;
                         });
