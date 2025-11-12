@@ -280,7 +280,8 @@ class MTMOCRProcessor:
         self,
         image_paths: List[str],
         prompt: str = "<image>\n<|grounding|>Convert the document to markdown.",
-        num_workers: int = 32
+        num_workers: int = 32,
+        progress_callback: Optional[callable] = None
     ) -> List[Dict]:
         """
         Birden fazla görseli batch olarak işle
@@ -289,11 +290,15 @@ class MTMOCRProcessor:
             image_paths: Görsel dosya yolları listesi
             prompt: OCR prompt
             num_workers: Paralel işlem sayısı
+            progress_callback: Progress güncellemesi için callback fonksiyonu
             
         Returns:
             Tüm görseller için OCR sonuçları
         """
         print(f"\n📰 {len(image_paths)} gazete sayfası işleniyor...")
+        
+        if progress_callback:
+            progress_callback(0, len(image_paths), "Görseller hazırlanıyor...")
         
         # Görselleri paralel olarak hazırla
         print("🔄 Görseller hazırlanıyor...")
@@ -316,6 +321,9 @@ class MTMOCRProcessor:
         
         # Batch inference
         print("🤖 OCR işlemi yapılıyor...")
+        if progress_callback:
+            progress_callback(0, len(processed_images), "OCR işlemi yapılıyor...")
+            
         batch_inputs = [img['cache_item'] for img in processed_images]
         
         outputs_list = self.llm.generate(
@@ -325,9 +333,14 @@ class MTMOCRProcessor:
         
         # Sonuçları işle ve kaydet
         print("💾 Sonuçlar kaydediliyor...")
+        if progress_callback:
+            progress_callback(0, len(processed_images), "Sonuçlar kaydediliyor...")
+            
         results = []
         
         for idx, (output, img_data) in enumerate(zip(outputs_list, processed_images)):
+            if progress_callback:
+                progress_callback(idx + 1, len(processed_images), f"Sonuç kaydediliyor... ({idx+1}/{len(processed_images)})")
             try:
                 # OCR çıktısı
                 ocr_text = output.outputs[0].text

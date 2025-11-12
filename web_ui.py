@@ -41,13 +41,27 @@ def allowed_file(filename):
 
 def get_or_create_processor():
     """OCR processor'ı lazily oluştur"""
-    global ocr_processor
+    global ocr_processor, processing_status
     if ocr_processor is None:
-        print("🚀 OCR Processor başlatılıyor...")
-        ocr_processor = MTMOCRProcessor(
-            output_dir=app.config['OUTPUT_FOLDER'],
-            max_concurrency=30
-        )
+        try:
+            processing_status['status_message'] = '🚀 Model yükleniyor... (ilk çalıştırmada 1-2 dakika sürebilir)'
+            print("🚀 OCR Processor başlatılıyor...")
+            print("🚀 Model yükleniyor...")
+            
+            ocr_processor = MTMOCRProcessor(
+                output_dir=app.config['OUTPUT_FOLDER'],
+                max_concurrency=30
+            )
+            
+            print("✅ Model hazır!")
+            processing_status['status_message'] = '✅ Model hazır!'
+            
+        except Exception as e:
+            error_msg = f"❌ Model yükleme hatası: {str(e)}"
+            print(error_msg)
+            processing_status['status_message'] = error_msg
+            raise
+            
     return ocr_processor
 
 @app.route('/')
@@ -126,23 +140,44 @@ def process_images():
             processing_status['is_processing'] = True
             processing_status['total'] = len(image_paths)
             processing_status['progress'] = 0
-            processing_status['status_message'] = 'OCR işlemi başladı...'
+            processing_status['status_message'] = 'OCR işlemi başlatılıyor...'
             
+            print(f"📋 {len(image_paths)} dosya işlenecek")
+            
+            # Model yükleniyor (ilk çalıştırmada)
+            processing_status['status_message'] = '📦 Model hazırlanıyor...'
             processor = get_or_create_processor()
             
-            # İşleme
+            # İşleme başladı
+            processing_status['status_message'] = f'🔍 OCR işleniyor... (0/{len(image_paths)})'
+            print(f"🔍 OCR işlemi başladı: {len(image_paths)} dosya")
+            
+            # Progress callback fonksiyonu
+            def update_progress(current, total, message):
+                processing_status['progress'] = current
+                processing_status['total'] = total
+                processing_status['status_message'] = f'{message} ({current}/{total})'
+                print(f"📊 Progress: {current}/{total} - {message}")
+            
             results = processor.process_batch(
                 image_paths,
-                num_workers=16
+                num_workers=16,
+                progress_callback=update_progress
             )
             
             processing_status['status_message'] = f'✅ {len(results)} sayfa başarıyla işlendi!'
             processing_status['progress'] = len(results)
+            print(f"✅ İşlem tamamlandı: {len(results)} sonuç")
             
         except Exception as e:
-            processing_status['status_message'] = f'❌ Hata: {str(e)}'
+            import traceback
+            error_details = traceback.format_exc()
+            error_msg = f'❌ Hata: {str(e)}'
+            processing_status['status_message'] = error_msg
+            print(f"❌ İşlem hatası:\n{error_details}")
         finally:
             processing_status['is_processing'] = False
+            print("🏁 İşlem tamamlandı veya sonlandı")
     
     thread = threading.Thread(target=process_background)
     thread.start()
