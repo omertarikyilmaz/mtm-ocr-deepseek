@@ -339,8 +339,8 @@ class MTMOCRProcessor:
             
             for word in batch_words:
                 try:
-                    # REC mode prompt (DeepSeek dokümantasyonundan)
-                    locate_prompt = f"<image>\nLocate <|ref|>{word}<|/ref|> in the image."
+                    # ✅ FIX: <|grounding|> tag'ini ekle (yardımcı kaynaktan)
+                    locate_prompt = f"<image>\n<|grounding|>\nLocate <|ref|>{word}<|/ref|> in the image."
                     
                     cache_item = {
                         "prompt": locate_prompt,
@@ -359,49 +359,71 @@ class MTMOCRProcessor:
                     
                     # DEBUG: İlk 3 kelime için response'u göster
                     if len(word_locations) < 3:
-                        print(f"[DEBUG] '{word}' için DeepSeek response: {response[:200]}...")
+                        print(f"[DEBUG] '{word}' için DeepSeek response: {response[:300]}...")
                     
-                    # Response formatı: <|det|>[[x1,y1,x2,y2]]<|/det|>
-                    pattern = r'<\|det\|>(.*?)<\|/det\|>'
-                    coords_match = re.search(pattern, response)
+                    # ✅ FIX: Doğru regex pattern (ref ve det tag'lerini birlikte yakala)
+                    # Pattern: <|ref|>kelime<|/ref|><|det|>[[coords]]<|/det|>
+                    pattern = r'<\|ref\|>(?P<label>.*?)<\|/ref\|>\s*<\|det\|>\s*(?P<coords>\[.*?\])\s*<\|/det\|>'
+                    coords_match = re.search(pattern, response, re.DOTALL)
                     
                     if coords_match:
-                        coords_str = coords_match.group(1)
-                        coords = eval(coords_str)
+                        coords_str = coords_match.group('coords').strip()
                         
-                        # İlk bbox'ı al (kelime birden fazla yerde olabilir, ilkini al)
-                        if isinstance(coords, list) and len(coords) > 0:
-                            bbox = coords[0] if isinstance(coords[0], list) else coords
-                            
-                            if len(bbox) >= 4:
-                                # DEBUG: İlk 3 kelime için normalize ve pixel değerleri göster
+                        # DEBUG: Raw coords string
+                        if len(word_locations) < 3:
+                            print(f"[DEBUG] '{word}' raw coords: {coords_str}")
+                        
+                        # ✅ FIX: ast.literal_eval kullan (daha güvenli)
+                        import ast
+                        parsed = ast.literal_eval(coords_str)
+                        
+                        # ✅ FIX: Çoklu bbox desteği (yardımcı kaynaktan)
+                        # Tek bbox: [x1,y1,x2,y2] veya [[x1,y1,x2,y2]]
+                        # Çoklu bbox: [[x1,y1,x2,y2], [x1,y1,x2,y2], ...]
+                        if isinstance(parsed, list) and len(parsed) == 4 and all(isinstance(n, (int, float)) for n in parsed):
+                            # Tek bbox: [x1,y1,x2,y2]
+                            box_coords = [parsed]
+                            if len(word_locations) < 3:
+                                print(f"[DEBUG] '{word}' tek bbox tespit edildi")
+                        elif isinstance(parsed, list):
+                            # Çoklu bbox veya [[x1,y1,x2,y2]]
+                            box_coords = parsed
+                            if len(word_locations) < 3:
+                                print(f"[DEBUG] '{word}' {len(box_coords)} bbox tespit edildi")
+                        else:
+                            print(f"[UYARI] '{word}' için beklenmeyen format: {type(parsed)}")
+                            continue
+                        
+                        # Her bbox için işle (aynı kelime birden fazla yerde olabilir!)
+                        word_lower = word.lower()
+                        word_locations[word_lower] = []  # Liste olarak sakla
+                        
+                        for idx, bbox in enumerate(box_coords):
+                            if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
+                                # DEBUG
                                 if len(word_locations) < 3:
-                                    print(f"[DEBUG] '{word}' normalize bbox: {bbox}")
+                                    print(f"[DEBUG] '{word}' bbox {idx+1}: normalize {bbox}")
                                     print(f"[DEBUG] Görsel boyutu: {image_width}x{image_height}")
                                 
-                                # DeepSeek OCR HER ZAMAN 0-999 arası normalize döndürür!
-                                # Resmi kod: x1 = int(x1 / 999 * image_width)
-                                # modeling_deepseekocr.py satır 104-108
-                                x1 = int(bbox[0] / 999 * image_width)
-                                y1 = int(bbox[1] / 999 * image_height)
-                                x2 = int(bbox[2] / 999 * image_width)
-                                y2 = int(bbox[3] / 999 * image_height)
+                                # Normalize (0-999) → Pixel
+                                x1 = int(float(bbox[0]) / 999 * image_width)
+                                y1 = int(float(bbox[1]) / 999 * image_height)
+                                x2 = int(float(bbox[2]) / 999 * image_width)
+                                y2 = int(float(bbox[3]) / 999 * image_height)
                                 
-                                # DEBUG: İlk 3 kelime için pixel değerleri göster
+                                # DEBUG
                                 if len(word_locations) < 3:
-                                    print(f"[DEBUG] '{word}' pixel bbox: x1={x1}, y1={y1}, x2={x2}, y2={y2}, w={x2-x1}, h={y2-y1}")
+                                    print(f"[DEBUG] '{word}' bbox {idx+1}: pixel x1={x1}, y1={y1}, x2={x2}, y2={y2}, w={x2-x1}, h={y2-y1}")
                                 
-                                # Lowercase key kullan (arama kolaylığı için)
-                                word_lower = word.lower()
-                                word_locations[word_lower] = {
+                                word_locations[word_lower].append({
                                     'bbox': {
                                         'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
                                         'width': x2 - x1, 'height': y2 - y1
                                     }
-                                }
-                                
-                                if len(word_locations) % 10 == 0:
-                                    print(f"[LOCATE] {len(word_locations)}/{len(words)} kelime bulundu")
+                                })
+                        
+                        if len(word_locations) % 10 == 0:
+                            print(f"[LOCATE] {len(word_locations)}/{len(words)} kelime bulundu")
                                     
                 except Exception as e:
                     print(f"[LOCATE] Hata '{word}': {e}")
@@ -541,27 +563,38 @@ class MTMOCRProcessor:
                     # DEBUG: İlk 3 kelimenin bbox'larını göster
                     if word_locations:
                         print(f"[DEBUG] İlk 3 kelime lokasyonu:")
-                        for word, data in list(word_locations.items())[:3]:
-                            print(f"  '{word}': {data['bbox']}")
+                        for word, bbox_list in list(word_locations.items())[:3]:
+                            print(f"  '{word}': {len(bbox_list)} bbox bulundu")
+                            for i, bbox_data in enumerate(bbox_list[:2]):  # İlk 2 bbox'ı göster
+                                print(f"    [{i+1}] {bbox_data['bbox']}")
                     else:
                         print(f"[UYARI] Locate mode hiç kelime bulamadı! Free OCR bbox'ları kullanılacak.")
                     
-                    # Orijinal sırayla word_positions oluştur
+                    # ✅ FIX: Çoklu bbox desteği - her kelime tekrarı için sıradaki bbox'ı kullan
                     word_positions = []
+                    bbox_usage_count = {}  # Her kelime için kaç bbox kullandığımızı takip et
+                    
                     for idx, word_text in enumerate(all_words):
                         word_lower = word_text.lower()
                         if word_lower in word_locations:
-                            word_positions.append({
-                                'text': word_text,
-                                'bbox': word_locations[word_lower]['bbox'],
-                                'index': idx
-                            })
-                        elif word_text.lower() in word_locations:
-                            word_positions.append({
-                                'text': word_text,
-                                'bbox': word_locations[word_text.lower()]['bbox'],
-                                'index': idx
-                            })
+                            # Bu kelimenin kaçıncı tekrarı?
+                            used_count = bbox_usage_count.get(word_lower, 0)
+                            bbox_list = word_locations[word_lower]
+                            
+                            # Eğer bu tekrar için bbox varsa kullan
+                            if used_count < len(bbox_list):
+                                word_positions.append({
+                                    'text': word_text,
+                                    'bbox': bbox_list[used_count]['bbox'],
+                                    'index': idx,
+                                    'occurrence': used_count + 1  # Kaçıncı tekrar olduğunu belirt
+                                })
+                                bbox_usage_count[word_lower] = used_count + 1
+                            else:
+                                # Bbox kalmadı, bu tekrarı atla veya uyarı ver
+                                if used_count == len(bbox_list):  # İlk kez bbox bittiğinde uyar
+                                    print(f"[UYARI] '{word_text}' için {len(bbox_list)} bbox var ama {used_count+1}. tekrar isteniyor")
+                                bbox_usage_count[word_lower] = used_count + 1
                 
                 # JSON sonuç
                 result_data = {
