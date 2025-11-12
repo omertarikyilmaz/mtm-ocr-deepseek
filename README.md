@@ -221,7 +221,6 @@ Tüm taglar temizlenmiş
 
 ```
 mtm-ocr-deepseek/
-├── mtm_batch_ocr.py          # Ana batch OCR işleyici
 ├── app/                       # Ana uygulama kodu
 │   ├── core/                 # OCR işleme modülü
 │   │   └── ocr_processor.py  # MTMOCRProcessor
