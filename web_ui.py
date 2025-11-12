@@ -258,6 +258,108 @@ def serve_visualization(filename):
     viz_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations')
     return send_from_directory(viz_dir, filename)
 
+@app.route('/original/<result_id>')
+def serve_original_image(result_id):
+    """Orijinal görseli servis et"""
+    json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
+    
+    if not os.path.exists(json_file):
+        return "Dosya bulunamadı", 404
+    
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Orijinal görsel yolu
+        original_path = data.get('image_path', '')
+        if not original_path or not os.path.exists(original_path):
+            return "Orijinal görsel bulunamadı", 404
+        
+        return send_from_directory(os.path.dirname(original_path), os.path.basename(original_path))
+    except Exception as e:
+        return f"Hata: {str(e)}", 500
+
+@app.route('/generate-boxes/<result_id>', methods=['POST'])
+def generate_boxes(result_id):
+    """Seçilen kelimeler için kutu oluştur"""
+    try:
+        # Seçilen kelimeleri al
+        data = request.get_json()
+        selected_words = data.get('words', [])  # Liste of word texts
+        
+        if not selected_words:
+            return jsonify({'error': 'Kelime seçilmedi'}), 400
+        
+        # JSON dosyasını oku
+        json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
+        if not os.path.exists(json_file):
+            return jsonify({'error': 'Sonuç bulunamadı'}), 404
+        
+        with open(json_file, 'r', encoding='utf-8') as f:
+            result_data = json.load(f)
+        
+        # Seçilen kelimelerin pozisyonlarını filtrele
+        all_words = result_data.get('words', [])
+        filtered_positions = []
+        
+        for word_text in selected_words:
+            # Bu kelimeyi JSON'da bul
+            for word_info in all_words:
+                if word_info['text'] == word_text:
+                    filtered_positions.append(word_info)
+        
+        if not filtered_positions:
+            return jsonify({'error': 'Seçilen kelimeler JSON\'da bulunamadı'}), 404
+        
+        # Orijinal görsel
+        original_path = result_data.get('image_path', '')
+        if not os.path.exists(original_path):
+            return jsonify({'error': 'Orijinal görsel bulunamadı'}), 404
+        
+        # Kutulu görsel oluştur
+        timestamp_str = int(time.time())
+        output_filename = f"{result_id}_selected_{timestamp_str}.jpg"
+        output_path = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations', output_filename)
+        
+        processor = get_or_create_processor()
+        processor.visualize_word_positions(
+            original_path,
+            filtered_positions,
+            output_path,
+            show_text=False,  # Sadece kutu
+            box_width=3  # Kalın çizgi
+        )
+        
+        # Seçilen kelimeleri TXT olarak kaydet
+        txt_filename = f"{result_id}_selected_{timestamp_str}.txt"
+        txt_path = os.path.join(app.config['OUTPUT_FOLDER'], 'results', txt_filename)
+        
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            for word_info in filtered_positions:
+                f.write(word_info['text'] + '\n')
+        
+        return jsonify({
+            'success': True,
+            'image_url': f'/visualization/{output_filename}',
+            'txt_url': f'/download-selected-txt/{txt_filename}',
+            'word_count': len(filtered_positions)
+        })
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[ERROR] Kutu oluşturma hatası:\n{error_details}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download-selected-txt/<filename>')
+def download_selected_txt(filename):
+    """Seçilen kelimelerin TXT dosyasını indir"""
+    directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
+    if os.path.exists(os.path.join(directory, filename)):
+        return send_from_directory(directory, filename, as_attachment=True)
+    else:
+        return "Dosya bulunamadı", 404
+
 @app.route('/download/<result_id>/<file_type>')
 def download_result(result_id, file_type):
     """Sonuçları indir (json veya image)"""

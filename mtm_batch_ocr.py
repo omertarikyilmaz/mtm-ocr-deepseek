@@ -312,33 +312,6 @@ class MTMOCRProcessor:
                 # Kutuyu çiz
                 draw.rectangle([x1, y1, x2, y2], outline=color, width=box_width)
                 
-                # Yarı saydam dolgu
-                overlay = Image.new('RGBA', img_draw.size, (0, 0, 0, 0))
-                overlay_draw = ImageDraw.Draw(overlay)
-                overlay_draw.rectangle([x1, y1, x2, y2], fill=color + (30,))
-                img_draw = Image.alpha_composite(img_draw.convert('RGBA'), overlay).convert('RGB')
-                
-                # Metin göster
-                if show_text and text:
-                    # Metin için arka plan
-                    text_bbox = draw.textbbox((0, 0), text, font=font)
-                    text_width = text_bbox[2] - text_bbox[0]
-                    text_height = text_bbox[3] - text_bbox[1]
-                    
-                    # Metin pozisyonu (kutunun üstünde)
-                    text_x = x1
-                    text_y = max(0, y1 - text_height - 2)
-                    
-                    # Arka plan çiz
-                    draw = ImageDraw.Draw(img_draw)
-                    draw.rectangle(
-                        [text_x, text_y, text_x + text_width + 4, text_y + text_height + 2],
-                        fill=(255, 255, 255, 200)
-                    )
-                    
-                    # Metni çiz
-                    draw.text((text_x + 2, text_y), text, fill=color, font=font)
-                
             except Exception as e:
                 print(f"[WARNING] Kutu cizim hatasi ({idx}): {e}")
                 continue
@@ -613,19 +586,19 @@ class MTMOCRProcessor:
                 
                 # TXT dosyası artık kaydedilmiyor - her şey JSON'da
                 
-                # Görselleştirme - BİZ ÇİZİYORUZ (DeepSeek değil!)
-                viz_path = os.path.join(
-                    self.output_dir,
-                    'visualizations',
-                    f'{image_filename}_{timestamp}_boxes.jpg'
-                )
-                self.visualize_word_positions(
-                    img_data['image_path'],  # Orijinal görsel yolu
-                    word_positions,
-                    viz_path,
-                    show_text=True,  # Kelimeyi göster
-                    box_width=2  # İnce çizgi
-                )
+                # Görselleştirme YOK - Kullanıcı manuel seçecek
+                # viz_path = os.path.join(
+                #     self.output_dir,
+                #     'visualizations',
+                #     f'{image_filename}_{timestamp}_boxes.jpg'
+                # )
+                # self.visualize_word_positions(
+                #     img_data['image_path'],  # Orijinal görsel yolu
+                #     word_positions,
+                #     viz_path,
+                #     show_text=True,  # Kelimeyi göster
+                #     box_width=2  # İnce çizgi
+                # )
                 
                 results.append(result_data)
                 
