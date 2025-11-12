@@ -321,18 +321,23 @@ class MTMOCRProcessor:
         batch_size: int = 10
     ) -> Dict[str, Dict]:
         """
-        Her kelime için locate prompt ile koordinat bul
-        kaynak.md'deki rec mode: <image>\nLocate <|ref|>xxxx<|/ref|> in the image.
+        Her kelime için Locate (REC) mode ile koordinat bul
+        Prompt: <image>\nLocate <|ref|>xxxx<|/ref|> in the image.
+        
+        Bu mod Free OCR'dan DAHA DOĞRU pozisyon verir!
         """
         word_locations = {}
         image = Image.open(image_path).convert('RGB')
         image_width, image_height = image.size
+        
+        print(f"[LOCATE] {len(words)} kelime için pozisyon bulunuyor...")
         
         for i in range(0, len(words), batch_size):
             batch_words = words[i:i+batch_size]
             
             for word in batch_words:
                 try:
+                    # REC mode prompt (DeepSeek dokümantasyonundan)
                     locate_prompt = f"<image>\nLocate <|ref|>{word}<|/ref|> in the image."
                     
                     cache_item = {
@@ -350,6 +355,7 @@ class MTMOCRProcessor:
                     output = self.llm.generate([cache_item], sampling_params=self.sampling_params)[0]
                     response = output.outputs[0].text
                     
+                    # Response formatı: <|det|>[[x1,y1,x2,y2]]<|/det|>
                     pattern = r'<\|det\|>(.*?)<\|/det\|>'
                     coords_match = re.search(pattern, response)
                     
@@ -357,22 +363,34 @@ class MTMOCRProcessor:
                         coords_str = coords_match.group(1)
                         coords = eval(coords_str)
                         
+                        # İlk bbox'ı al (kelime birden fazla yerde olabilir, ilkini al)
                         if isinstance(coords, list) and len(coords) > 0:
                             bbox = coords[0] if isinstance(coords[0], list) else coords
+                            
                             if len(bbox) >= 4:
+                                # Normalize koordinatları (0-999) pixel'e çevir
                                 x1 = int(bbox[0] / 999 * image_width)
                                 y1 = int(bbox[1] / 999 * image_height)
                                 x2 = int(bbox[2] / 999 * image_width)
                                 y2 = int(bbox[3] / 999 * image_height)
                                 
-                                word_locations[word] = {
+                                # Lowercase key kullan (arama kolaylığı için)
+                                word_lower = word.lower()
+                                word_locations[word_lower] = {
                                     'bbox': {
                                         'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
                                         'width': x2 - x1, 'height': y2 - y1
                                     }
                                 }
+                                
+                                if len(word_locations) % 10 == 0:
+                                    print(f"[LOCATE] {len(word_locations)}/{len(words)} kelime bulundu")
+                                    
                 except Exception as e:
+                    print(f"[LOCATE] Hata '{word}': {e}")
                     continue
+        
+        print(f"[LOCATE] Toplam {len(word_locations)} kelime pozisyonu bulundu")
         return word_locations
     
     def process_batch(
@@ -474,25 +492,49 @@ class MTMOCRProcessor:
                     import traceback
                     print(traceback.format_exc())
                 
-                if use_word_location and len(word_positions) < 20:
+                # Free OCR genelde pozisyonları eksik verir
+                # Her kelime için Locate (REC) mode kullan - DAHA DOĞRU
+                print(f"[INFO] Free OCR'dan {len(word_positions)} kelime pozisyonu bulundu")
+                
+                if use_word_location:
+                    # Tüm kelimeleri çıkar
                     all_words = clean_text.split()
                     all_words = [w.strip('.,!?;:()[]{}\"\'') for w in all_words if len(w.strip('.,!?;:()[]{}\"\'')) > 0]
                     
+                    # Unique kelimeleri bul
                     seen = set()
                     unique_words = []
                     for word in all_words:
-                        if word not in seen:
-                            seen.add(word)
+                        word_lower = word.lower()
+                        if word_lower not in seen and len(word) > 1:  # Tek harfleri atla
+                            seen.add(word_lower)
                             unique_words.append(word)
                     
-                    word_locations = self.locate_words_in_image(img_data['image_path'], unique_words, batch_size=20)
+                    print(f"[INFO] Locate mode ile {len(unique_words)} unique kelime aranacak...")
                     
+                    # Her kelime için Locate mode ile pozisyon bul
+                    word_locations = self.locate_words_in_image(
+                        img_data['image_path'], 
+                        unique_words, 
+                        batch_size=10  # Daha küçük batch
+                    )
+                    
+                    print(f"[INFO] Locate mode'dan {len(word_locations)} kelime pozisyonu bulundu")
+                    
+                    # Orijinal sırayla word_positions oluştur
                     word_positions = []
                     for idx, word_text in enumerate(all_words):
-                        if word_text in word_locations:
+                        word_lower = word_text.lower()
+                        if word_lower in word_locations:
                             word_positions.append({
                                 'text': word_text,
-                                'bbox': word_locations[word_text]['bbox'],
+                                'bbox': word_locations[word_lower]['bbox'],
+                                'index': idx
+                            })
+                        elif word_text.lower() in word_locations:
+                            word_positions.append({
+                                'text': word_text,
+                                'bbox': word_locations[word_text.lower()]['bbox'],
                                 'index': idx
                             })
                 
