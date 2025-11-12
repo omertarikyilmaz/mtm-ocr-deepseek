@@ -168,21 +168,13 @@ class MTMOCRProcessor:
                         if len(bbox) >= 4:
                             x1, y1, x2, y2 = bbox[:4]
                             
-                            # DeepSeek OCR koordinat sistemi kontrolü
-                            # Eğer değerler 999'dan büyükse → zaten pixel
-                            # Eğer değerler 999'dan küçükse → normalize (0-999)
-                            if x2 > 999 or y2 > 999:
-                                # Zaten pixel değerler
-                                pixel_x1 = int(x1)
-                                pixel_y1 = int(y1)
-                                pixel_x2 = int(x2)
-                                pixel_y2 = int(y2)
-                            else:
-                                # Normalize değerler (0-999) → pixel'e çevir
-                                pixel_x1 = int(x1 / 999 * image_width)
-                                pixel_y1 = int(y1 / 999 * image_height)
-                                pixel_x2 = int(x2 / 999 * image_width)
-                                pixel_y2 = int(y2 / 999 * image_height)
+                            # DeepSeek OCR HER ZAMAN 0-999 arası normalize döndürür!
+                            # Resmi kod: x1 = int(x1 / 999 * image_width)
+                            # modeling_deepseekocr.py satır 104-108
+                            pixel_x1 = int(x1 / 999 * image_width)
+                            pixel_y1 = int(y1 / 999 * image_height)
+                            pixel_x2 = int(x2 / 999 * image_width)
+                            pixel_y2 = int(y2 / 999 * image_height)
                             
                             word_positions.append({
                                 'text': word_text.strip(),
@@ -378,23 +370,13 @@ class MTMOCRProcessor:
                             bbox = coords[0] if isinstance(coords[0], list) else coords
                             
                             if len(bbox) >= 4:
-                                # DeepSeek OCR koordinat sistemi kontrolü
-                                norm_x1, norm_y1, norm_x2, norm_y2 = bbox[0], bbox[1], bbox[2], bbox[3]
-                                
-                                # Eğer değerler 999'dan büyükse → zaten pixel
-                                # Eğer değerler 999'dan küçükse → normalize (0-999)
-                                if norm_x2 > 999 or norm_y2 > 999:
-                                    # Zaten pixel değerler
-                                    x1 = int(norm_x1)
-                                    y1 = int(norm_y1)
-                                    x2 = int(norm_x2)
-                                    y2 = int(norm_y2)
-                                else:
-                                    # Normalize değerler (0-999) → pixel'e çevir
-                                    x1 = int(norm_x1 / 999 * image_width)
-                                    y1 = int(norm_y1 / 999 * image_height)
-                                    x2 = int(norm_x2 / 999 * image_width)
-                                    y2 = int(norm_y2 / 999 * image_height)
+                                # DeepSeek OCR HER ZAMAN 0-999 arası normalize döndürür!
+                                # Resmi kod: x1 = int(x1 / 999 * image_width)
+                                # modeling_deepseekocr.py satır 104-108
+                                x1 = int(bbox[0] / 999 * image_width)
+                                y1 = int(bbox[1] / 999 * image_height)
+                                x2 = int(bbox[2] / 999 * image_width)
+                                y2 = int(bbox[3] / 999 * image_height)
                                 
                                 # Lowercase key kullan (arama kolaylığı için)
                                 word_lower = word.lower()
