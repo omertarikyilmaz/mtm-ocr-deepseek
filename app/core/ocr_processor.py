@@ -66,22 +66,11 @@ class MTMOCRProcessor:
         os.makedirs(os.path.join(output_dir, 'results'), exist_ok=True)
         os.makedirs(os.path.join(output_dir, 'visualizations'), exist_ok=True)
         
-        # LLM'i başlat
-        print("\n" + "="*70)
-        print("DEEPSEEK OCR MODEL YUKLENIYOR")
-        print("="*70)
-        print(f"Model: {model_path}")
-        print(f"GPU Memory Kullanimi: 90%")
-        print(f"Maksimum Eslesme: {max_concurrency}")
-        print(f"\n[1/5] Model dosyalari indiriliyor...")
-        print("      Ilk calistirmada: ~15GB model indirilecek (5-10 dakika)")
-        print("      Sonraki calistirmalarda: Cache'den yuklenecek (30-60 saniye)")
+        print("\n[INFO] DeepSeek OCR modeli yukleniyor")
+        print(f"       Model: {model_path}")
         
         import time
         start_time = time.time()
-        
-        print(f"\n[2/5] vLLM engine baslatiliyor...")
-        print("      Model agirliklari GPU'ya yukleniyor...")
         
         self.llm = LLM(
             model=model_path,
@@ -96,11 +85,6 @@ class MTMOCRProcessor:
             gpu_memory_utilization=0.9,
         )
         
-        elapsed = time.time() - start_time
-        print(f"\n[3/5] Model GPU'ya yuklendi ({elapsed:.1f} saniye)")
-        print("      Inference parametreleri ayarlaniyor...")
-        
-        # Sampling parametreleri
         logits_processors = [
             NoRepeatNGramLogitsProcessor(
                 ngram_size=40, 
@@ -116,14 +100,10 @@ class MTMOCRProcessor:
             skip_special_tokens=False,
         )
         
-        print(f"[4/5] Image processor baslatiliyor...")
         self.processor = DeepseekOCRProcessor()
         
         total_time = time.time() - start_time
-        print(f"[5/5] Tamamlandi - Toplam sure: {total_time:.1f} saniye")
-        print("\n" + "="*70)
-        print("MODEL HAZIR - OCR islemleri yapilabilir")
-        print("="*70 + "\n")
+        print(f"[INFO] Model yukleme tamamlandi ({total_time:.1f} saniye)")
     
     def extract_word_positions(
         self, 
@@ -166,16 +146,7 @@ class MTMOCRProcessor:
             matches = []
             format_name = "none"
         
-        print(f"[DEBUG] Format tespit: <|{format_name}|> - {len(matches)} eslesmeler bulundu")
-        print(f"[DEBUG] Raw output ilk 1000 karakter:")
-        print(f"{text[:1000]}")
-        
-        # Eğer grounding formatı yoksa, düz metin olarak parse et
         if format_name == "none":
-            print(f"[WARNING] Grounding formatı yok - Model markdown veya duz metin donduruyor")
-            print(f"[INFO] Bu durumda koordinat bilgisi olmayacak")
-            print(f"[INFO] Ama metin raw_ocr_output ve full_text'te olacak")
-            # Bu durumda sadece metin var, koordinat yok
             return []
         
         for idx, (word_text, coordinates_str) in enumerate(matches):
@@ -221,37 +192,25 @@ class MTMOCRProcessor:
                                 'index': idx
                             })
             except Exception as e:
-                print(f"[WARNING] Koordinat parse hatasi: {e}")
-                print(f"           Word: {word_text[:50] if word_text else 'N/A'}...")
-                print(f"           Coordinates: {coordinates_str[:100] if coordinates_str else 'N/A'}...")
                 continue
         
-        print(f"[INFO] Toplam {len(word_positions)} kelime pozisyonu cikarildi")
         return word_positions
     
     def extract_text_only(self, text: str) -> str:
         """
-        OCR çıktısından sadece metni çıkart (pozisyon tagları olmadan)
-        Çoklu format desteği
+        OCR çıktısından sadece metni çıkart
         """
-        # <|ref|> tagları içindeki metni çıkart
         pattern = r'<\|ref\|>(.*?)<\|/ref\|>'
         matches = re.findall(pattern, text, re.DOTALL)
         
         if matches:
-            # Tüm ref içeriklerini birleştir, kelimeler arası boşluk bırak
             clean_text = ' '.join(match.strip() for match in matches if match.strip())
-            print(f"[DEBUG] Ref taglarından {len(matches)} kelime çıkarıldı")
         else:
-            # Fallback: Tüm özel tagları temizle
-            print(f"[WARNING] <|ref|> tagı bulunamadı, fallback temizlik yapılıyor")
             clean_text = re.sub(r'<\|.*?\|>', '', text)
             clean_text = re.sub(r'\n\n+', '\n\n', clean_text)
             clean_text = re.sub(r' +', ' ', clean_text)
         
-        result = clean_text.strip()
-        print(f"[DEBUG] Temiz metin uzunluğu: {len(result)} karakter")
-        return result
+        return clean_text.strip()
     
     def visualize_word_positions(
         self,
@@ -277,52 +236,36 @@ class MTMOCRProcessor:
         Returns:
             Bounding box'lı görsel
         """
-        print(f"[INFO] Gorsel uzerine {len(word_positions)} kelime icin kutu ciziliyor...")
-        
-        # Orijinal görseli yükle
         image = Image.open(image_path).convert('RGB')
         img_draw = image.copy()
-        
-        # Draw objesi oluştur
         draw = ImageDraw.Draw(img_draw, 'RGBA')
         
-        # Font yükle
         try:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
         except:
             font = ImageFont.load_default()
         
-        # Her kelime için kutu çiz
         for idx, word_info in enumerate(word_positions):
             try:
                 bbox = word_info['bbox']
                 text = word_info.get('text', '')
                 
-                # Renk belirle
                 if box_color:
                     color = box_color
                 else:
-                    # Her kelime için farklı renk (ama okunabilir)
-                    hue = (idx * 137.5) % 360  # Golden angle
+                    hue = (idx * 137.5) % 360
                     import colorsys
                     rgb = colorsys.hsv_to_rgb(hue/360, 0.7, 0.9)
                     color = tuple(int(c * 255) for c in rgb)
                 
-                # Koordinatlar
                 x1, y1 = bbox['x1'], bbox['y1']
                 x2, y2 = bbox['x2'], bbox['y2']
-                
-                # Kutuyu çiz
                 draw.rectangle([x1, y1, x2, y2], outline=color, width=box_width)
                 
             except Exception as e:
-                print(f"[WARNING] Kutu cizim hatasi ({idx}): {e}")
                 continue
         
-        # Kaydet
         img_draw.save(output_path, quality=95)
-        print(f"[SUCCESS] Gorsel kaydedildi: {output_path}")
-        
         return img_draw
     
     def process_single_image(
@@ -367,7 +310,7 @@ class MTMOCRProcessor:
             }
             
         except Exception as e:
-            print(f"[ERROR] Gorsel isleme hatasi ({image_path}): {e}")
+            print(f"[HATA] Gorsel isleme hatasi: {image_path}")
             return None
     
     def locate_words_in_image(
@@ -380,23 +323,17 @@ class MTMOCRProcessor:
         Her kelime için locate prompt ile koordinat bul
         kaynak.md'deki rec mode: <image>\nLocate <|ref|>xxxx<|/ref|> in the image.
         """
-        print(f"[INFO] {len(words)} kelimenin koordinatlari araniyor...")
-        
         word_locations = {}
         image = Image.open(image_path).convert('RGB')
         image_width, image_height = image.size
         
-        # Kelimeleri batch'lere böl (her seferinde batch_size kelime)
         for i in range(0, len(words), batch_size):
             batch_words = words[i:i+batch_size]
-            print(f"[INFO] Batch {i//batch_size + 1}/{(len(words) + batch_size - 1)//batch_size}: {len(batch_words)} kelime")
             
             for word in batch_words:
                 try:
-                    # Locate prompt (kaynak.md satır 35)
                     locate_prompt = f"<image>\nLocate <|ref|>{word}<|/ref|> in the image."
                     
-                    # Process image with locate prompt
                     cache_item = {
                         "prompt": locate_prompt,
                         "multi_modal_data": {
@@ -409,11 +346,9 @@ class MTMOCRProcessor:
                         },
                     }
                     
-                    # Generate
                     output = self.llm.generate([cache_item], sampling_params=self.sampling_params)[0]
                     response = output.outputs[0].text
                     
-                    # Parse koordinat
                     pattern = r'<\|det\|>(.*?)<\|/det\|>'
                     coords_match = re.search(pattern, response)
                     
@@ -436,10 +371,7 @@ class MTMOCRProcessor:
                                     }
                                 }
                 except Exception as e:
-                    print(f"[WARNING] '{word}' kelimesi icin koordinat bulunamadi: {e}")
                     continue
-        
-        print(f"[SUCCESS] {len(word_locations)}/{len(words)} kelimenin koordinati bulundu")
         return word_locations
     
     def process_batch(
@@ -481,13 +413,8 @@ class MTMOCRProcessor:
         processed_images = [img for img in processed_images if img is not None]
         
         if not processed_images:
-            print("[ERROR] Islenecek gorsel bulunamadi!")
+            print("[HATA] Islenecek gorsel bulunamadi")
             return []
-        
-        print(f"[INFO] {len(processed_images)} gorsel hazir")
-        
-        # Batch inference
-        print("[2/3] OCR islemi yapiliyor...")
         if progress_callback:
             progress_callback(0, len(processed_images), "OCR islemi yapiliyor")
             
@@ -498,8 +425,6 @@ class MTMOCRProcessor:
             sampling_params=self.sampling_params
         )
         
-        # Sonuçları işle ve kaydet
-        print("[3/3] Sonuclar kaydediliyor...")
         if progress_callback:
             progress_callback(0, len(processed_images), "Sonuclar kaydediliyor")
             
@@ -524,13 +449,8 @@ class MTMOCRProcessor:
                     import shutil
                     try:
                         shutil.copy2(img_data['image_path'], original_saved_path)
-                        print(f"[SUCCESS] Gorsel originals klasorune kopyalandi: {image_filename}")
                     except Exception as e:
-                        print(f"[ERROR] Gorsel kopyalama hatasi: {e}")
-                        # Hata olsa bile devam et, image_path upload yolunu kullanır
                         original_saved_path = img_data['image_path']
-                else:
-                    print(f"[INFO] Gorsel zaten mevcut: {image_filename}")
                 
                 # Kelime pozisyonlarını çıkart
                 word_positions = self.extract_word_positions(
@@ -542,19 +462,10 @@ class MTMOCRProcessor:
                 # Temiz metni çıkart
                 clean_text = self.extract_text_only(ocr_text)
                 
-                print(f"[DEBUG] OCR output length: {len(ocr_text)} characters")
-                print(f"[DEBUG] Word positions from grounding: {len(word_positions)}")
-                print(f"[DEBUG] Clean text length: {len(clean_text)} characters")
-                
-                # YENI STRATEJI: Free OCR ile metin aldık, şimdi her kelime için locate
-                if use_word_location and len(word_positions) < 20:  # Eğer az kelime varsa (paragraf seviyesi)
-                    print(f"[INFO] Grounding yetersiz ({len(word_positions)} item), LOCATE modu baslatiliyor...")
-                    
-                    # Metinden kelimeleri ayır - OKUNUS SIRASINA GORE
+                if use_word_location and len(word_positions) < 20:
                     all_words = clean_text.split()
                     all_words = [w.strip('.,!?;:()[]{}\"\'') for w in all_words if len(w.strip('.,!?;:()[]{}\"\'')) > 0]
                     
-                    # Benzersiz kelimeleri al AMA sırayı koru
                     seen = set()
                     unique_words = []
                     for word in all_words:
@@ -562,22 +473,16 @@ class MTMOCRProcessor:
                             seen.add(word)
                             unique_words.append(word)
                     
-                    print(f"[INFO] {len(unique_words)} benzersiz kelime bulundu (toplam {len(all_words)} kelime)")
-                    
-                    # Her kelime için koordinat bul - BATCH SIZE 20
                     word_locations = self.locate_words_in_image(img_data['image_path'], unique_words, batch_size=20)
                     
-                    # word_positions array'ini oluştur - OKUNUS SIRASINA GORE
                     word_positions = []
                     for idx, word_text in enumerate(all_words):
                         if word_text in word_locations:
                             word_positions.append({
                                 'text': word_text,
                                 'bbox': word_locations[word_text]['bbox'],
-                                'index': idx  # Okunus sırasına göre index
+                                'index': idx
                             })
-                    
-                    print(f"[SUCCESS] LOCATE ile {len(word_positions)} kelimenin koordinati alindi (okunus sirasinda)!")
                 
                 # JSON sonuç
                 result_data = {
@@ -623,15 +528,14 @@ class MTMOCRProcessor:
                 
                 results.append(result_data)
                 
-                print(f"✅ {image_filename}: {len(word_positions)} kelime bulundu")
+                print(f"[INFO] {image_filename}: {len(word_positions)} kelime islendi")
                 
             except Exception as e:
-                print(f"❌ Sonuç kaydetme hatası ({img_data['image_path']}): {e}")
+                print(f"[HATA] Sonuc kaydetme hatasi: {img_data['image_path']}")
                 continue
         
-        print(f"\n🎉 İşlem tamamlandı! {len(results)} gazete başarıyla işlendi.")
-        print(f"📁 Sonuçlar: {self.output_dir}/results/")
-        print(f"🖼️  Görselleştirmeler: {self.output_dir}/visualizations/")
+        print(f"\n[INFO] Islem tamamlandi: {len(results)} dosya islendi")
+        print(f"       Sonuclar: {self.output_dir}/results/")
         
         return results
 
@@ -697,10 +601,10 @@ def main():
         image_paths = glob.glob(args.input)
     
     if not image_paths:
-        print(f"❌ {args.input} konumunda görsel bulunamadı!")
+        print(f"[HATA] {args.input} konumunda gorsel bulunamadi")
         return
     
-    print(f"📸 {len(image_paths)} görsel bulundu")
+    print(f"[INFO] {len(image_paths)} gorsel bulundu")
     
     # Processor'ı başlat
     processor = MTMOCRProcessor(

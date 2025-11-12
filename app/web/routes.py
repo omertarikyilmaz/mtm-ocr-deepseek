@@ -147,24 +147,15 @@ def process_images():
             processing_status['progress'] = 0
             processing_status['status_message'] = 'OCR islemi baslatiiliyor...'
             
-            print(f"[INFO] {len(image_paths)} dosya islenecek")
-            
-            # Model yükleniyor (ilk çalıştırmada)
             processing_status['status_message'] = 'Model hazirlaniyor...'
             processor = get_or_create_processor()
             
-            # İşleme başladı
             processing_status['status_message'] = f'OCR isleniyor... (0/{len(image_paths)})'
-            print(f"[INFO] OCR islemi basladi: {len(image_paths)} dosya")
             
-            # Progress callback fonksiyonu
             def update_progress(current, total, message):
                 processing_status['progress'] = current
                 processing_status['total'] = total
                 processing_status['status_message'] = f'{message} ({current}/{total})'
-                # Sadece önemli milestone'larda log yaz
-                if current == 0 or current == total or current % max(1, total // 10) == 0:
-                    print(f"[PROGRESS] {current}/{total} - {message}")
             
             results = processor.process_batch(
                 image_paths,
@@ -174,17 +165,14 @@ def process_images():
             
             processing_status['status_message'] = f'Basarili: {len(results)} sayfa islendi'
             processing_status['progress'] = len(results)
-            print(f"[SUCCESS] Islem tamamlandi: {len(results)} sonuc")
             
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            error_msg = f'[ERROR] Hata: {str(e)}'
+            error_msg = f'Hata: {str(e)}'
             processing_status['status_message'] = error_msg
-            print(f"[ERROR] Islem hatasi:\n{error_details}")
         finally:
             processing_status['is_processing'] = False
-            print("[INFO] Islem tamamlandi veya sonlandi")
     
     thread = threading.Thread(target=process_background)
     thread.start()
@@ -298,11 +286,10 @@ def delete_all_results():
                         os.remove(file_path)
                         deleted_count += 1
         
-        print(f"[INFO] Tum sonuclar silindi: {deleted_count} JSON dosyasi")
         return jsonify({'success': True, 'message': f'{deleted_count} JSON dosyasi silindi'})
         
     except Exception as e:
-        print(f"[ERROR] Toplu silme hatasi: {e}")
+        print(f"[HATA] Toplu silme hatasi")
         return jsonify({'error': str(e)}), 500
 
 def main():
@@ -318,43 +305,26 @@ def main():
     args = parser.parse_args()
     
     print(f"""
-    ========================================================================
-    MTM OCR - Web Arayuzu
-    Medya Takip Merkezi
-    ========================================================================
+=======================================================================
+MTM OCR - Web Arayuzu
+Medya Takip Merkezi
+=======================================================================
+
+URL: http://{args.host}:{args.port}
+Upload Directory: {app.config['UPLOAD_FOLDER']}
+Output Directory: {app.config['OUTPUT_FOLDER']}
+=======================================================================
+""")
     
-    URL: http://{args.host}:{args.port}
-    Upload Directory: {app.config['UPLOAD_FOLDER']}
-    Output Directory: {app.config['OUTPUT_FOLDER']}
-    """)
-    
-    # Model'i başlangıçta yükle (kullanıcı beklemesin)
     if args.preload_model:
-        print("\n" + "="*70)
-        print("[INFO] MODEL ON YUKLEME BASLIYOR")
-        print("       Container baslatildiginda model otomatik yuklenecek")
-        print("       Ilk calistirmada: ~15GB model indirilecek (5-10 dakika)")
-        print("="*70 + "\n")
-        
+        print("[INFO] Model yukleme baslatiliyor")
         try:
             get_or_create_processor()
-            
-            print("\n" + "="*70)
-            print("[SUCCESS] MODEL ON YUKLEME TAMAMLANDI")
-            print("          Kullanicilar aninda OCR islemi yapabilir")
-            print("="*70 + "\n")
-            
+            print("[INFO] Model yukleme tamamlandi")
         except Exception as e:
-            import traceback
-            print("\n" + "="*70)
-            print(f"[ERROR] MODEL ON YUKLEME HATASI")
-            print(f"        {e}")
-            print(f"        Model ilk kulanimda yuklenecek")
-            print("="*70 + "\n")
-            print("Detayli hata:")
-            print(traceback.format_exc())
+            print(f"[UYARI] Model yukleme hatasi, ilk kullanımda yuklenecek")
     
-    print(f"\n    Web Arayuzu: http://localhost:{args.port}\n")
+    print(f"[INFO] Web arayuzu: http://localhost:{args.port}")
     
     app.run(
         host=args.host,

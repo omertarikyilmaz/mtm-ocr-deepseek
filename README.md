@@ -1,25 +1,24 @@
-# 📰 MTM OCR - Medya Takip Merkezi
+# MTM OCR - Medya Takip Merkezi
 
-DeepSeek-OCR tabanlı, birden fazla gazete sayfasını aynı anda işleyip **her kelimenin pozisyonunu** kayıt eden batch OCR sistemi.
+DeepSeek-OCR tabanlı, birden fazla gazete sayfasını aynı anda işleyip her kelimenin pozisyonunu kayıt eden batch OCR sistemi.
 
-## ✨ Özellikler
+## Özellikler
 
-- **🚀 Batch İşleme**: Birden fazla gazete sayfasını aynı anda OCR ile okuma
-- **📍 Kelime Pozisyonları**: Her kelimenin piksel koordinatlarını JSON formatında kaydetme
-- **🎨 Görselleştirme**: Bounding box'larla kelime pozisyonlarını görsel üzerine çizme
-- **🌐 Web Arayüzü**: Drag & drop ile dosya yükleme ve sonuçları görüntüleme
-- **🐳 Docker Desteği**: Tek komutla çalışır hale getirme
-- **⚡ GPU Hızlandırma**: NVIDIA GPU desteği ile hızlı işleme
-- **📊 Detaylı Raporlar**: JSON, TXT ve görselleştirilmiş çıktılar
+- Batch İşleme: Birden fazla gazete sayfasını aynı anda OCR ile okuma
+- Kelime Pozisyonları: Her kelimenin piksel koordinatlarını JSON formatında kaydetme
+- Web Arayüzü: Drag & drop ile dosya yükleme ve sonuçları görüntüleme
+- Docker Desteği: Tek komutla çalışır hale getirme
+- GPU Hızlandırma: NVIDIA GPU desteği ile hızlı işleme
+- Detaylı Raporlar: JSON formatında çıktılar
 
-## 🎯 Kullanım Senaryoları
+## Kullanım Senaryoları
 
 - Gazete arşivlerinin dijitalleştirilmesi
 - Medya takip ve analiz sistemleri
 - Gazete sayfalarından metin ve konum çıkarma
 - OCR sonuçlarının pozisyon bilgisiyle birlikte saklanması
 
-## 🚀 Hızlı Başlangıç (Docker ile - ÖNERİLEN)
+## Hızlı Başlangıç (Docker ile - ÖNERİLEN)
 
 ### Ön Gereksinimler
 
@@ -110,7 +109,7 @@ pip install flash-attn==2.7.2.post1 --no-build-isolation
 python run.py --host 0.0.0.0 --port 5000
 ```
 
-## 📖 Kullanım Kılavuzu
+## Kullanım Kılavuzu
 
 ### 1. Web Arayüzü ile Kullanım
 
@@ -217,7 +216,7 @@ Tüm taglar temizlenmiş
 - Her kelimenin etrafında renkli kutular
 - Orijinal görsel üzerine çizilmiş
 
-## 📁 Proje Yapısı
+## Proje Yapısı
 
 ```
 mtm-ocr-deepseek/
@@ -246,7 +245,7 @@ mtm-ocr-deepseek/
 └── uploads/                   # Yüklenen dosyalar
 ```
 
-## ⚙️ Konfigürasyon
+## Konfigürasyon
 
 ### Performans Ayarları
 
@@ -282,7 +281,7 @@ MIN_CROPS = 2
 MAX_CROPS = 6  # Düşük GPU belleği için 6, yüksek için 9
 ```
 
-## 🔧 Sorun Giderme
+## Sorun Giderme
 
 ### GPU Bellek Hatası (CUDA OOM)
 
@@ -320,7 +319,7 @@ docker run --rm --gpus all nvidia/cuda:11.8.0-base nvidia-smi
 # Eğer hata alırsanız, nvidia-docker2'yi yeniden kurun
 ```
 
-## 📊 Performans
+## Performans
 
 Test ortamı: NVIDIA A100 40GB
 
@@ -338,7 +337,7 @@ Test ortamı: NVIDIA A100 40GB
 
 Bu proje Medya Takip Merkezi için özel olarak geliştirilmiştir.
 
-## 📄 Lisans
+## Lisans
 
 Bu proje DeepSeek-OCR'nin lisansına tabidir.
 
