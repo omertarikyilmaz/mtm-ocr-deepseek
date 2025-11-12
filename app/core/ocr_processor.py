@@ -519,13 +519,14 @@ class MTMOCRProcessor:
                 else:
                     print(f"[INFO] image_base64 hazir, uzunluk: {len(image_base64)} karakter")
                 
-                # JSON dosyasını kaydet (result_id ile)
+                # JSON dosyasını kaydet - DOSYA ADI = image_id.json (basit ve garantili)
                 json_filename = f'{image_id}.json'
                 json_path = os.path.join(
                     self.output_dir,
                     'results',
                     json_filename
                 )
+                print(f"[INFO] JSON kaydediliyor: {json_path}")
                 with open(json_path, 'w', encoding='utf-8') as f:
                     json.dump(result_data, f, ensure_ascii=False, indent=2)
                 
