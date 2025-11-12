@@ -283,6 +283,8 @@ MAX_CROPS = 6  # Düşük GPU belleği için 6, yüksek için 9
 
 ## ⚠️ Bilinen Sorunlar / Known Issues
 
+> 📖 **Detaylı bilgi için:** [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) dosyasına bakın.
+
 ### Pozisyonel Labeling Sorunu (Kritik)
 
 **Durum:** Aktif olarak araştırılıyor 🔍
