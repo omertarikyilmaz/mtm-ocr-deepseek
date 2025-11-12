@@ -564,7 +564,8 @@ class MTMOCRProcessor:
                 # JSON sonuç
                 result_data = {
                     'image_path': img_data['image_path'],
-                    'image_filename': image_filename,
+                    'image_filename': image_filename,  # Tam dosya adı (uzantıyla)
+                    'image_stem': image_path_obj.stem,  # Uzantısız dosya adı (eşleştirme için)
                     'timestamp': timestamp,
                     'image_size': {
                         'width': img_data['width'],
