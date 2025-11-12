@@ -64,7 +64,16 @@ class MTMOCRProcessor:
         os.makedirs(os.path.join(output_dir, 'visualizations'), exist_ok=True)
         
         # LLM'i başlat
-        print("🚀 Model yükleniyor...")
+        print("\n" + "="*70)
+        print("🚀 DEEPSEEK OCR MODEL YÜKLENİYOR...")
+        print("="*70)
+        print(f"📦 Model: {model_path}")
+        print(f"💾 GPU Memory: 90% kullanılacak")
+        print(f"⚡ Max Concurrent: {max_concurrency}")
+        print("\n📥 Model dosyaları indiriliyor/yükleniyor...")
+        print("   (İlk çalıştırmada ~15GB model indirilecek, 5-10 dakika sürebilir)")
+        print("   (Sonraki çalıştırmalarda cache'den yüklenecek, 30-60 saniye)\n")
+        
         self.llm = LLM(
             model=model_path,
             hf_overrides={"architectures": ["DeepseekOCRForCausalLM"]},
@@ -77,6 +86,8 @@ class MTMOCRProcessor:
             tensor_parallel_size=1,
             gpu_memory_utilization=0.9,
         )
+        
+        print("\n🔧 Model GPU'ya yüklendi, parametreler ayarlanıyor...")
         
         # Sampling parametreleri
         logits_processors = [
@@ -94,8 +105,12 @@ class MTMOCRProcessor:
             skip_special_tokens=False,
         )
         
+        print("🖼️  Image processor hazırlanıyor...")
         self.processor = DeepseekOCRProcessor()
-        print("✅ Model hazır!")
+        
+        print("\n" + "="*70)
+        print("✅ MODEL TAMAMEN HAZIR! OCR işlemleri yapılabilir.")
+        print("="*70 + "\n")
     
     def extract_word_positions(
         self, 

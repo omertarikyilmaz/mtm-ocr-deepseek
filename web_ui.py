@@ -44,21 +44,21 @@ def get_or_create_processor():
     global ocr_processor, processing_status
     if ocr_processor is None:
         try:
-            processing_status['status_message'] = '🚀 Model yükleniyor... (ilk çalıştırmada 1-2 dakika sürebilir)'
-            print("🚀 OCR Processor başlatılıyor...")
-            print("🚀 Model yükleniyor...")
+            processing_status['status_message'] = '🚀 Model yükleniyor... (ilk çalıştırmada 5-10 dakika sürebilir)'
             
             ocr_processor = MTMOCRProcessor(
                 output_dir=app.config['OUTPUT_FOLDER'],
                 max_concurrency=30
             )
             
-            print("✅ Model hazır!")
             processing_status['status_message'] = '✅ Model hazır!'
             
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             error_msg = f"❌ Model yükleme hatası: {str(e)}"
             print(error_msg)
+            print(error_details)
             processing_status['status_message'] = error_msg
             raise
             
@@ -310,13 +310,29 @@ def main():
     
     # Model'i başlangıçta yükle (kullanıcı beklemesin)
     if args.preload_model:
-        print("    🚀 Model yükleniyor...")
+        print("\n" + "="*70)
+        print("⏳ MODEL ÖN YÜKLEME BAŞLIYOR...")
+        print("   (Container başlatıldığında model otomatik yüklenecek)")
+        print("   (İlk çalıştırmada ~15GB model indirilecek ve 5-10 dakika sürebilir)")
+        print("="*70 + "\n")
+        
         try:
             get_or_create_processor()
-            print("    ✅ Model hazır! Kullanıcılar bekleme yapmadan OCR yapabilir.\n")
+            
+            print("\n" + "="*70)
+            print("✅ ÖN YÜKLEME TAMAMLANDI!")
+            print("   Kullanıcılar şimdi ANINDA OCR işlemi yapabilir.")
+            print("="*70 + "\n")
+            
         except Exception as e:
-            print(f"    ⚠️  Model yükleme hatası: {e}")
-            print("    ℹ️  Model ilk kullanımda yüklenecek.\n")
+            import traceback
+            print("\n" + "="*70)
+            print(f"⚠️  MODEL ÖN YÜKLEME HATASI:")
+            print(f"   {e}")
+            print("   Model ilk kullanımda yüklenecek.")
+            print("="*70 + "\n")
+            print("Detaylı hata:")
+            print(traceback.format_exc())
     
     print(f"    Tarayıcınızda açın: http://localhost:{args.port}\n")
     
