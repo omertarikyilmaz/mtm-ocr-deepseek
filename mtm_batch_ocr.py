@@ -141,6 +141,9 @@ class MTMOCRProcessor:
         """
         word_positions = []
         
+        # GROUNDING TAG OLMADAN: Modelin kendi formatını kontrol et
+        # Bazen markdown format döndürür, bazen düz metin
+        
         # Format 1: <|ref|>text<|/ref|><|det|>coords<|/det|>
         pattern1 = r'<\|ref\|>(.*?)<\|/ref\|><\|det\|>(.*?)<\|/det\|>'
         matches1 = re.findall(pattern1, text, re.DOTALL)
@@ -161,8 +164,17 @@ class MTMOCRProcessor:
             format_name = "none"
         
         print(f"[DEBUG] Format tespit: <|{format_name}|> - {len(matches)} eslesmeler bulundu")
-        print(f"[DEBUG] Raw output ilk 500 karakter:")
-        print(f"{text[:500]}")
+        print(f"[DEBUG] Raw output ilk 1000 karakter:")
+        print(f"{text[:1000]}")
+        
+        # Eğer grounding formatı yoksa, düz metin olarak parse et
+        if format_name == "none":
+            print(f"[WARNING] Grounding formatı yok - Model duz metin donduruyor")
+            print(f"[INFO] Bu normal! Grounding tag olmadan OCR yaptik")
+            print(f"[INFO] Koordinat bilgisi yok ama metin var")
+            # Bu durumda sadece metin var, koordinat yok
+            # Kullanıcıya raw_ocr_output'tan metin göstereceğiz
+            return []
         
         for idx, (word_text, coordinates_str) in enumerate(matches):
             try:
@@ -293,7 +305,7 @@ class MTMOCRProcessor:
     def process_single_image(
         self,
         image_path: str,
-        prompt: str = "<image>\n<|grounding|>OCR this image."
+        prompt: str = "<image>\nRecognize and extract all text from the image, including Turkish characters."
     ) -> Dict:
         """
         Tek bir görseli işle
@@ -337,7 +349,7 @@ class MTMOCRProcessor:
     def process_batch(
         self,
         image_paths: List[str],
-        prompt: str = "<image>\n<|grounding|>OCR this image.",
+        prompt: str = "<image>\nRecognize and extract all text from the image, including Turkish characters.",
         num_workers: int = 32,
         progress_callback: Optional[callable] = None
     ) -> List[Dict]:
