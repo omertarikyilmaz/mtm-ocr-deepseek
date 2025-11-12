@@ -84,17 +84,22 @@ def upload_files():
     
     for file in files:
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            # Benzersiz dosya adı oluştur
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            name, ext = os.path.splitext(filename)
-            unique_filename = f"{name}_{timestamp}{ext}"
+            # Benzersiz ID oluştur (UUID kullan)
+            import uuid
+            unique_id = str(uuid.uuid4())
+            original_filename = secure_filename(file.filename)
+            _, ext = os.path.splitext(original_filename)
+            ext = ext.lower()  # .jpg, .jpeg, .png
+            
+            # Dosya adı: {unique_id}.{ext}
+            unique_filename = f"{unique_id}{ext}"
             
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(filepath)
             uploaded_files.append({
-                'filename': unique_filename,
-                'original_name': filename,
+                'id': unique_id,  # Benzersiz ID
+                'filename': unique_filename,  # {id}.jpg
+                'original_name': original_filename,
                 'path': filepath
             })
     
@@ -260,7 +265,7 @@ def serve_visualization(filename):
 
 @app.route('/original/<result_id>')
 def serve_original_image(result_id):
-    """Orijinal görseli servis et"""
+    """Orijinal görseli servis et - BASIT: image_id ile direkt bul"""
     json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
     
     if not os.path.exists(json_file):
@@ -270,75 +275,32 @@ def serve_original_image(result_id):
         with open(json_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
+        # BASIT: image_id ile direkt bul
+        image_id = data.get('image_id', '')
         image_filename = data.get('image_filename', '')
-        original_path = data.get('image_path', '')
         upload_dir = app.config['UPLOAD_FOLDER']
         
-        # Strateji 1: image_filename ile direkt eşleşme
+        # image_filename direkt kullan ({id}.jpg formatında)
         if image_filename:
             upload_path = os.path.join(upload_dir, image_filename)
             if os.path.exists(upload_path):
                 return send_from_directory(upload_dir, image_filename)
         
-        # Strateji 2: image_path'den dosya adını çıkar
-        if original_path:
-            path_obj = Path(original_path)
-            filename_from_path = path_obj.name
-            
-            # Upload klasöründen dene
-            upload_path = os.path.join(upload_dir, filename_from_path)
-            if os.path.exists(upload_path):
-                return send_from_directory(upload_dir, filename_from_path)
-            
-            # Direkt path'den dene
-            if os.path.exists(original_path):
-                return send_from_directory(path_obj.parent, filename_from_path)
-        
-        # Strateji 3: Upload klasöründeki tüm dosyaları tara ve eşleştir (stem bazlı)
-        if os.path.exists(upload_dir):
-            upload_files = os.listdir(upload_dir)
-            
-            # Önce JSON'daki image_stem'i kullan (varsa)
-            image_stem = data.get('image_stem', '')
-            if image_stem:
-                for upload_file in upload_files:
-                    if Path(upload_file).stem == image_stem:
-                        return send_from_directory(upload_dir, upload_file)
-            
-            # image_filename'in stem'ini al (uzantısız)
-            if image_filename:
-                search_stem = Path(image_filename).stem
-                # Upload klasöründeki dosyalarda bu stem'i ara
-                for upload_file in upload_files:
-                    if Path(upload_file).stem == search_stem:
-                        return send_from_directory(upload_dir, upload_file)
-            
-            # original_path'den stem al
-            if original_path:
-                search_stem = Path(original_path).stem
-                for upload_file in upload_files:
-                    if Path(upload_file).stem == search_stem:
-                        return send_from_directory(upload_dir, upload_file)
-        
-        # Strateji 4: Uzantı yoksa yaygın uzantıları dene
-        if image_filename and '.' not in image_filename:
+        # Fallback: image_id varsa, uzantıları dene
+        if image_id:
             for ext in ['jpg', 'jpeg', 'png']:
-                test_filename = f"{image_filename}.{ext}"
+                test_filename = f"{image_id}.{ext}"
                 test_path = os.path.join(upload_dir, test_filename)
                 if os.path.exists(test_path):
                     return send_from_directory(upload_dir, test_filename)
         
-        # Hata mesajı (detaylı debug)
-        upload_files = os.listdir(upload_dir) if os.path.exists(upload_dir) else []
+        # Hata
         print(f"[ERROR] Orijinal görsel bulunamadı:")
         print(f"  - result_id: {result_id}")
+        print(f"  - image_id: {image_id}")
         print(f"  - image_filename: {image_filename}")
-        print(f"  - image_path: {original_path}")
         print(f"  - upload_dir: {upload_dir}")
-        print(f"  - upload_dir exists: {os.path.exists(upload_dir)}")
-        print(f"  - upload_files count: {len(upload_files)}")
-        print(f"  - upload_files (first 10): {upload_files[:10]}")
-        return f"Orijinal görsel bulunamadı (filename: {image_filename})", 404
+        return f"Orijinal görsel bulunamadı (image_id: {image_id})", 404
         
     except Exception as e:
         import traceback
@@ -378,10 +340,24 @@ def generate_boxes(result_id):
         if not filtered_positions:
             return jsonify({'error': 'Seçilen kelimeler JSON\'da bulunamadı'}), 404
         
-        # Orijinal görsel
-        original_path = result_data.get('image_path', '')
-        if not os.path.exists(original_path):
-            return jsonify({'error': 'Orijinal görsel bulunamadı'}), 404
+        # Orijinal görsel - image_id ile bul
+        image_id = result_data.get('image_id', '')
+        image_filename = result_data.get('image_filename', '')
+        upload_dir = app.config['UPLOAD_FOLDER']
+        
+        # image_filename ile direkt bul
+        original_path = os.path.join(upload_dir, image_filename) if image_filename else ''
+        if not original_path or not os.path.exists(original_path):
+            # Fallback: image_id ile uzantıları dene
+            if image_id:
+                for ext in ['jpg', 'jpeg', 'png']:
+                    test_path = os.path.join(upload_dir, f"{image_id}.{ext}")
+                    if os.path.exists(test_path):
+                        original_path = test_path
+                        break
+            
+            if not original_path or not os.path.exists(original_path):
+                return jsonify({'error': 'Orijinal görsel bulunamadı'}), 404
         
         # Kutulu görsel oluştur
         timestamp_str = int(time.time())

@@ -509,9 +509,10 @@ class MTMOCRProcessor:
                 # OCR çıktısı
                 ocr_text = output.outputs[0].text
                 
-                # Dosya adı (tam adı, uzantıyla)
+                # Dosya adı (benzersiz ID'den)
                 image_path_obj = Path(img_data['image_path'])
-                image_filename = image_path_obj.name  # Tam dosya adı (uzantıyla)
+                image_filename = image_path_obj.name  # {unique_id}.jpg formatında
+                image_id = image_path_obj.stem  # Benzersiz ID (uzantısız)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 
                 # Kelime pozisyonlarını çıkart
@@ -563,9 +564,9 @@ class MTMOCRProcessor:
                 
                 # JSON sonuç
                 result_data = {
+                    'image_id': image_id,  # Benzersiz ID (dosya adı = {id}.jpg)
+                    'image_filename': image_filename,  # {id}.jpg
                     'image_path': img_data['image_path'],
-                    'image_filename': image_filename,  # Tam dosya adı (uzantıyla)
-                    'image_stem': image_path_obj.stem,  # Uzantısız dosya adı (eşleştirme için)
                     'timestamp': timestamp,
                     'image_size': {
                         'width': img_data['width'],
