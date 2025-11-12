@@ -222,15 +222,22 @@ Tüm taglar temizlenmiş
 ```
 mtm-ocr-deepseek/
 ├── mtm_batch_ocr.py          # Ana batch OCR işleyici
-├── web_ui.py                  # Flask web uygulaması
-├── templates/
-│   └── index.html             # Web arayüzü
-├── DeepSeek-OCR/              # DeepSeek-OCR kodu
+├── app/                       # Ana uygulama kodu
+│   ├── core/                 # OCR işleme modülü
+│   │   └── ocr_processor.py  # MTMOCRProcessor
+│   ├── web/                  # Web arayüzü
+│   │   ├── routes.py         # Flask routes
+│   │   └── templates/        # HTML şablonları
+│   │       └── index.html
+│   └── utils/                # Yardımcı fonksiyonlar
+├── docker/                   # Docker yapılandırması
+│   ├── Dockerfile            # Docker image tanımı
+│   ├── docker-compose.yml    # Docker Compose config
+│   └── docker-entrypoint.sh  # Container başlangıç scripti
+├── DeepSeek-OCR/             # DeepSeek-OCR kodu
 │   └── DeepSeek-OCR-master/
 │       └── DeepSeek-OCR-vllm/
-├── Dockerfile                 # Docker image tanımı
-├── docker-compose.yml         # Docker Compose config
-├── docker-entrypoint.sh       # Container başlangıç scripti
+├── run.py                    # Uygulama giriş noktası
 ├── requirements.txt           # Python bağımlılıkları
 ├── README.md                  # Bu dosya
 ├── output/                    # Çıktı klasörü
