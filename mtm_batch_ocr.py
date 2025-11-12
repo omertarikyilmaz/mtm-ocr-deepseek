@@ -1,4 +1,4 @@
-d"""
+"""
 MTM Batch OCR Processor
 Medya Takip Merkezi için birden fazla gazete sayfasını batch olarak okuyup 
 her kelimenin pozisyonunu kaydeden sistem
