@@ -11,6 +11,12 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for
 from werkzeug.utils import secure_filename
 import threading
+import sys
+
+# DeepSeek-OCR modülünü Python path'ine ekle
+deepseek_vllm_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm')
+if deepseek_vllm_path not in sys.path:
+    sys.path.insert(0, deepseek_vllm_path)
 
 # MTM Batch OCR'ı import et
 from mtm_batch_ocr import MTMOCRProcessor

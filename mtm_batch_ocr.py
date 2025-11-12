@@ -1,4 +1,4 @@
-"""
+d"""
 MTM Batch OCR Processor
 Medya Takip Merkezi için birden fazla gazete sayfasını batch olarak okuyup 
 her kelimenin pozisyonunu kaydeden sistem
@@ -26,8 +26,12 @@ from vllm import LLM, SamplingParams
 from vllm.model_executor.models.registry import ModelRegistry
 
 # Import local modules
+# DeepSeek-OCR modülünü Python path'ine ekle
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), 'DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm'))
+deepseek_vllm_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm')
+if deepseek_vllm_path not in sys.path:
+    sys.path.insert(0, deepseek_vllm_path)
+
 from deepseek_ocr import DeepseekOCRForCausalLM
 from process.ngram_norepeat import NoRepeatNGramLogitsProcessor
 from process.image_process import DeepseekOCRProcessor
