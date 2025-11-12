@@ -128,6 +128,10 @@ class MTMOCRProcessor:
         # GROUNDING TAG OLMADAN: Modelin kendi formatını kontrol et
         # Bazen markdown format döndürür, bazen düz metin
         
+        # DEBUG: Free OCR response'un başını göster
+        print(f"[DEBUG FREE OCR] Response uzunluğu: {len(text)} karakter")
+        print(f"[DEBUG FREE OCR] İlk 500 karakter: {text[:500]}")
+        
         # Format 1: <|ref|>text<|/ref|><|det|>coords<|/det|>
         pattern1 = r'<\|ref\|>(.*?)<\|/ref\|><\|det\|>(.*?)<\|/det\|>'
         matches1 = re.findall(pattern1, text, re.DOTALL)
@@ -140,20 +144,24 @@ class MTMOCRProcessor:
         if len(matches1) > 0:
             matches = matches1
             format_name = "det"
+            print(f"[DEBUG FREE OCR] {len(matches1)} adet <|det|> match bulundu")
         elif len(matches2) > 0:
             matches = matches2
             format_name = "box"
+            print(f"[DEBUG FREE OCR] {len(matches2)} adet <|box|> match bulundu")
         else:
             matches = []
             format_name = "none"
+            print(f"[DEBUG FREE OCR] Hiç bbox match bulunamadı!")
         
         if format_name == "none":
             return []
         
         for idx, (word_text, coordinates_str) in enumerate(matches):
             try:
-                # Koordinatları parse et
-                coordinates = eval(coordinates_str)
+                # Koordinatları parse et (güvenli)
+                import ast
+                coordinates = ast.literal_eval(coordinates_str)
                 
                 # Liste içinde liste varsa düzleştir
                 if isinstance(coordinates, list):
@@ -168,6 +176,10 @@ class MTMOCRProcessor:
                         if len(bbox) >= 4:
                             x1, y1, x2, y2 = bbox[:4]
                             
+                            # DEBUG: İlk 3 kelime için bbox'ları göster
+                            if idx < 3:
+                                print(f"[DEBUG FREE OCR] '{word_text}' normalize bbox: {bbox}")
+                            
                             # DeepSeek OCR HER ZAMAN 0-999 arası normalize döndürür!
                             # Resmi kod: x1 = int(x1 / 999 * image_width)
                             # modeling_deepseekocr.py satır 104-108
@@ -175,6 +187,10 @@ class MTMOCRProcessor:
                             pixel_y1 = int(y1 / 999 * image_height)
                             pixel_x2 = int(x2 / 999 * image_width)
                             pixel_y2 = int(y2 / 999 * image_height)
+                            
+                            # DEBUG: İlk 3 kelime için pixel bbox'ları göster
+                            if idx < 3:
+                                print(f"[DEBUG FREE OCR] '{word_text}' pixel bbox: x1={pixel_x1}, y1={pixel_y1}, x2={pixel_x2}, y2={pixel_y2}, w={pixel_x2-pixel_x1}, h={pixel_y2-pixel_y1}")
                             
                             word_positions.append({
                                 'text': word_text.strip(),
@@ -274,7 +290,7 @@ class MTMOCRProcessor:
     def process_single_image(
         self,
         image_path: str,
-        prompt: str = "<image>\nFree OCR.",
+        prompt: str = "<image>\n<|grounding|>\nFree OCR.",
         use_word_location: bool = True
     ) -> Dict:
         """
@@ -435,10 +451,10 @@ class MTMOCRProcessor:
     def process_batch(
         self,
         image_paths: List[str],
-        prompt: str = "<image>\nFree OCR.",
+        prompt: str = "<image>\n<|grounding|>\nFree OCR.",
         num_workers: int = 32,
         progress_callback: Optional[callable] = None,
-        use_word_location: bool = True
+        use_word_location: bool = False  # Free OCR bbox'larını kullan
     ) -> List[Dict]:
         """
         Birden fazla görseli batch olarak işle
