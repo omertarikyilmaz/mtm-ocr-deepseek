@@ -260,13 +260,10 @@ def serve_visualization(filename):
 
 @app.route('/download/<result_id>/<file_type>')
 def download_result(result_id, file_type):
-    """Sonuçları indir (json, txt, veya image)"""
+    """Sonuçları indir (json veya image)"""
     if file_type == 'json':
         directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
         filename = f'{result_id}.json'
-    elif file_type == 'txt':
-        directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
-        filename = f'{result_id}.txt'
     elif file_type == 'image':
         # JSON'dan bilgi al
         json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
@@ -298,10 +295,9 @@ def delete_result(result_id):
             with open(json_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # İlgili tüm dosyaları sil
+            # İlgili tüm dosyaları sil (TXT artık yok)
             files_to_delete = [
                 os.path.join(results_dir, f'{result_id}.json'),
-                os.path.join(results_dir, f'{result_id}.txt'),
                 os.path.join(viz_dir, f"{data['image_filename']}_{data['timestamp']}_boxes.jpg")
             ]
             

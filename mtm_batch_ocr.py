@@ -139,50 +139,77 @@ class MTMOCRProcessor:
         Returns:
             Kelime pozisyon bilgileri listesi
         """
-        # <|ref|>text<|/ref|><|det|>[[x1,y1,x2,y2]]<|/det|> formatını bul
-        pattern = r'<\|ref\|>(.*?)<\|/ref\|><\|det\|>(.*?)<\|/det\|>'
-        matches = re.findall(pattern, text, re.DOTALL)
-        
         word_positions = []
+        
+        # Format 1: <|ref|>text<|/ref|><|det|>coords<|/det|>
+        pattern1 = r'<\|ref\|>(.*?)<\|/ref\|><\|det\|>(.*?)<\|/det\|>'
+        matches1 = re.findall(pattern1, text, re.DOTALL)
+        
+        # Format 2: <|ref|>text<|/ref|><|box|>coords<|/box|>
+        pattern2 = r'<\|ref\|>(.*?)<\|/ref\|><\|box\|>(.*?)<\|/box\|>'
+        matches2 = re.findall(pattern2, text, re.DOTALL)
+        
+        # Hangisi daha fazla sonuç veriyorsa onu kullan
+        if len(matches1) > 0:
+            matches = matches1
+            format_name = "det"
+        elif len(matches2) > 0:
+            matches = matches2
+            format_name = "box"
+        else:
+            matches = []
+            format_name = "none"
+        
+        print(f"[DEBUG] Format tespit: <|{format_name}|> - {len(matches)} eslesmeler bulundu")
+        print(f"[DEBUG] Raw output ilk 500 karakter:")
+        print(f"{text[:500]}")
         
         for idx, (word_text, coordinates_str) in enumerate(matches):
             try:
                 # Koordinatları parse et
                 coordinates = eval(coordinates_str)
                 
-                # Her bbox için kelime bilgisi kaydet
-                for bbox in coordinates:
-                    if len(bbox) >= 4:
-                        x1, y1, x2, y2 = bbox[:4]
-                        
-                        # Normalize edilmiş koordinatları (0-999) gerçek piksel koordinatlarına çevir
-                        pixel_x1 = int(x1 / 999 * image_width)
-                        pixel_y1 = int(y1 / 999 * image_height)
-                        pixel_x2 = int(x2 / 999 * image_width)
-                        pixel_y2 = int(y2 / 999 * image_height)
-                        
-                        word_positions.append({
-                            'text': word_text.strip(),
-                            'bbox': {
-                                'x1': pixel_x1,
-                                'y1': pixel_y1,
-                                'x2': pixel_x2,
-                                'y2': pixel_y2,
-                                'width': pixel_x2 - pixel_x1,
-                                'height': pixel_y2 - pixel_y1
-                            },
-                            'normalized_bbox': {
-                                'x1': x1,
-                                'y1': y1,
-                                'x2': x2,
-                                'y2': y2
-                            },
-                            'index': idx
-                        })
+                # Liste içinde liste varsa düzleştir
+                if isinstance(coordinates, list):
+                    if len(coordinates) > 0 and isinstance(coordinates[0], list):
+                        # [[x1,y1,x2,y2]] formatı
+                        bbox_list = coordinates
+                    else:
+                        # [x1,y1,x2,y2] formatı
+                        bbox_list = [coordinates]
+                    
+                    for bbox in bbox_list:
+                        if len(bbox) >= 4:
+                            x1, y1, x2, y2 = bbox[:4]
+                            
+                            # Normalize edilmiş koordinatları (0-999) gerçek piksel koordinatlarına çevir
+                            pixel_x1 = int(x1 / 999 * image_width)
+                            pixel_y1 = int(y1 / 999 * image_height)
+                            pixel_x2 = int(x2 / 999 * image_width)
+                            pixel_y2 = int(y2 / 999 * image_height)
+                            
+                            word_positions.append({
+                                'text': word_text.strip(),
+                                'bbox': {
+                                    'x1': pixel_x1,
+                                    'y1': pixel_y1,
+                                    'x2': pixel_x2,
+                                    'y2': pixel_y2,
+                                    'width': pixel_x2 - pixel_x1,
+                                    'height': pixel_y2 - pixel_y1
+                                },
+                                'normalized_bbox': {
+                                    'x1': x1,
+                                    'y1': y1,
+                                    'x2': x2,
+                                    'y2': y2
+                                },
+                                'index': idx
+                            })
             except Exception as e:
                 print(f"[WARNING] Koordinat parse hatasi: {e}")
-                print(f"           Word: {word_text[:50]}...")
-                print(f"           Coordinates: {coordinates_str[:100]}...")
+                print(f"           Word: {word_text[:50] if word_text else 'N/A'}...")
+                print(f"           Coordinates: {coordinates_str[:100] if coordinates_str else 'N/A'}...")
                 continue
         
         print(f"[INFO] Toplam {len(word_positions)} kelime pozisyonu cikarildi")
@@ -191,27 +218,26 @@ class MTMOCRProcessor:
     def extract_text_only(self, text: str) -> str:
         """
         OCR çıktısından sadece metni çıkart (pozisyon tagları olmadan)
-        
-        Args:
-            text: OCR çıktı metni
-            
-        Returns:
-            Temiz metin
+        Çoklu format desteği
         """
-        # Ref tagları içindeki metni çıkart
+        # <|ref|> tagları içindeki metni çıkart
         pattern = r'<\|ref\|>(.*?)<\|/ref\|>'
         matches = re.findall(pattern, text, re.DOTALL)
         
-        # Tüm kelimeleri birleştir
         if matches:
+            # Tüm ref içeriklerini birleştir, kelimeler arası boşluk bırak
             clean_text = ' '.join(match.strip() for match in matches if match.strip())
+            print(f"[DEBUG] Ref taglarından {len(matches)} kelime çıkarıldı")
         else:
-            # Eğer ref tagı yoksa, tüm tagları temizle
+            # Fallback: Tüm özel tagları temizle
+            print(f"[WARNING] <|ref|> tagı bulunamadı, fallback temizlik yapılıyor")
             clean_text = re.sub(r'<\|.*?\|>', '', text)
             clean_text = re.sub(r'\n\n+', '\n\n', clean_text)
             clean_text = re.sub(r' +', ' ', clean_text)
         
-        return clean_text.strip()
+        result = clean_text.strip()
+        print(f"[DEBUG] Temiz metin uzunluğu: {len(result)} karakter")
+        return result
     
     def visualize_word_positions(
         self,
@@ -420,14 +446,7 @@ class MTMOCRProcessor:
                 with open(json_path, 'w', encoding='utf-8') as f:
                     json.dump(result_data, f, ensure_ascii=False, indent=2)
                 
-                # Temiz metni kaydet
-                text_path = os.path.join(
-                    self.output_dir,
-                    'results',
-                    f'{image_filename}_{timestamp}.txt'
-                )
-                with open(text_path, 'w', encoding='utf-8') as f:
-                    f.write(clean_text)
+                # TXT dosyası artık kaydedilmiyor - her şey JSON'da
                 
                 # Görselleştirme
                 viz_path = os.path.join(

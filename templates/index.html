@@ -12,10 +12,10 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
             min-height: 100vh;
-            padding: 20px;
+            padding: 40px 20px;
         }
         
         .container {
@@ -25,21 +25,25 @@
         
         .header {
             background: white;
-            border-radius: 12px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e5e7eb;
         }
         
         .header h1 {
-            color: #333;
-            font-size: 32px;
-            margin-bottom: 10px;
+            color: #1f2937;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
         }
         
         .header p {
-            color: #666;
-            font-size: 16px;
+            color: #6b7280;
+            font-size: 15px;
+            font-weight: 400;
         }
         
         .card {
@@ -200,43 +204,42 @@
         
         .result-card {
             background: white;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
             overflow: hidden;
-            transition: all 0.3s;
+            transition: all 0.2s;
             cursor: pointer;
             position: relative;
         }
         
         .result-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border-color: #2563eb;
         }
         
         .result-card-delete {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 32px;
-            height: 32px;
-            background: rgba(220, 53, 69, 0.9);
-            border-radius: 50%;
+            top: 12px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            background: rgba(239, 68, 68, 0.95);
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 20px;
-            font-weight: bold;
+            font-size: 18px;
+            font-weight: 600;
             cursor: pointer;
             z-index: 10;
             transition: all 0.2s;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .result-card-delete:hover {
-            background: #c82333;
-            transform: scale(1.1);
+            background: #dc2626;
+            transform: scale(1.05);
         }
         
         .result-image {
@@ -252,17 +255,17 @@
         
         .result-title {
             font-weight: 600;
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 16px;
+            color: #1f2937;
+            margin-bottom: 12px;
+            font-size: 15px;
         }
         
         .result-meta {
             display: flex;
             justify-content: space-between;
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 15px;
+            color: #6b7280;
+            font-size: 13px;
+            margin-bottom: 16px;
         }
         
         .result-actions {
@@ -272,18 +275,16 @@
         
         .btn-small {
             padding: 8px 16px;
-            font-size: 14px;
+            font-size: 13px;
             flex: 1;
         }
         
         .btn-danger {
-            background: #dc3545;
-            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+            background: #ef4444;
         }
         
         .btn-danger:hover {
-            background: #c82333;
-            transform: translateY(-2px);
+            background: #dc2626;
         }
         
         .modal {
@@ -409,13 +410,13 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>📰 MTM OCR - Medya Takip Merkezi</h1>
-            <p>Gazete sayfalarınızı yükleyin, OCR ile metne çevirin ve her kelimenin pozisyonunu görüntüleyin</p>
+            <h1>MTM OCR</h1>
+            <p>Gazete sayfalarınızı analiz edin - Her kelimenin konumunu tespit edin</p>
         </div>
         
         <!-- Upload Section -->
         <div class="card">
-            <h2>📤 Gazete Yükle</h2>
+            <h2>Gazete Yükle</h2>
             
             <div class="upload-zone" id="uploadZone">
                 <div class="upload-icon">📄</div>
@@ -429,10 +430,10 @@
             
             <div style="margin-top: 20px; display: flex; gap: 10px;">
                 <button class="btn" id="processBtn" disabled>
-                    🚀 OCR İşlemini Başlat
+                    OCR İşlemini Başlat
                 </button>
                 <button class="btn btn-secondary" id="clearBtn" disabled>
-                    🗑️ Temizle
+                    Temizle
                 </button>
             </div>
             
@@ -446,11 +447,11 @@
         
         <!-- Results Section -->
         <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>📋 İşlenmiş Gazeteler</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2>İşlenmiş Gazeteler</h2>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-secondary" id="refreshBtn">🔄 Yenile</button>
-                    <button class="btn btn-danger" id="deleteAllBtn">🗑️ Tümünü Sil</button>
+                    <button class="btn btn-secondary" id="refreshBtn">Yenile</button>
+                    <button class="btn btn-danger" id="deleteAllBtn">Tümünü Sil</button>
                 </div>
             </div>
             <div id="resultsGrid" class="results-grid"></div>
@@ -665,10 +666,10 @@
                             </div>
                             <div class="result-actions">
                                 <button class="btn btn-small" onclick="event.stopPropagation(); downloadFile('${result.json_file.replace('.json', '')}', 'json')">
-                                    JSON ⬇️
+                                    JSON
                                 </button>
-                                <button class="btn btn-small" onclick="event.stopPropagation(); downloadFile('${result.json_file.replace('.json', '')}', 'txt')">
-                                    TXT ⬇️
+                                <button class="btn btn-small" onclick="event.stopPropagation(); downloadFile('${result.json_file.replace('.json', '')}', 'image')">
+                                    Görsel
                                 </button>
                             </div>
                         </div>
