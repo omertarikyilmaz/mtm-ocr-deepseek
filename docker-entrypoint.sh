@@ -10,7 +10,7 @@ echo ""
 # CUDA kontrolü
 if command -v nvidia-smi &> /dev/null; then
     echo "✅ NVIDIA GPU bulundu:"
-    nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+    nvidia-smi --query-gpu=name,memory.total,driver_version,cuda_version --format=csv,noheader
 else
     echo "⚠️  NVIDIA GPU bulunamadı! CPU modunda çalışacak (çok yavaş olabilir)"
 fi
@@ -21,7 +21,7 @@ echo "🔧 Ortam hazırlanıyor..."
 # Python sürümü kontrolü
 echo "Python sürümü: $(python --version)"
 echo "PyTorch sürümü: $(python -c 'import torch; print(torch.__version__)')"
-echo "CUDA erişimi: $(python -c 'import torch; print("Evet" if torch.cuda.is_available() else "Hayır")')"
+echo "CUDA erişimi: $(python -c 'import torch; print("Evet (" + str(torch.version.cuda) + ")" if torch.cuda.is_available() else "Hayır")')"
 
 # Gerekli dizinleri oluştur
 mkdir -p /app/uploads

@@ -1,7 +1,7 @@
 # MTM OCR - Medya Takip Merkezi
 # Docker image for DeepSeek-OCR with Web UI
 
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04
 
 # Temel paketler
 ENV DEBIAN_FRONTEND=noninteractive
@@ -23,28 +23,26 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 WORKDIR /app
 
 # CUDA ortam değişkenleri
-ENV CUDA_HOME=/usr/local/cuda-11.8
+ENV CUDA_HOME=/usr/local/cuda-12.1
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-ENV TRITON_PTXAS_PATH=/usr/local/cuda-11.8/bin/ptxas
+ENV TRITON_PTXAS_PATH=/usr/local/cuda-12.1/bin/ptxas
 
 # Python bağımlılıkları - önce temel paketler
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
-# PyTorch ve torchvision (CUDA 11.8 için)
+# PyTorch ve torchvision (CUDA 12.1 için)
 RUN pip3 install --no-cache-dir \
-    torch==2.6.0 \
-    torchvision==0.21.0 \
-    torchaudio==2.6.0 \
-    --index-url https://download.pytorch.org/whl/cu118
+    torch==2.4.0 \
+    torchvision==0.19.0 \
+    torchaudio==2.4.0 \
+    --index-url https://download.pytorch.org/whl/cu121
 
 # DeepSeek OCR kodu
 COPY DeepSeek-OCR/ /app/DeepSeek-OCR/
 
-# vLLM kurulumu
-RUN pip3 install --no-cache-dir \
-    vllm==0.8.5+cu118 \
-    --extra-index-url https://wheels.vllm.ai/nightly
+# vLLM kurulumu (CUDA 12.1 uyumlu)
+RUN pip3 install --no-cache-dir vllm==0.8.5
 
 # Diğer bağımlılıklar
 RUN pip3 install --no-cache-dir \
@@ -60,8 +58,8 @@ RUN pip3 install --no-cache-dir \
     flask \
     tqdm
 
-# Flash Attention (opsiyonel, hızlandırır)
-RUN pip3 install --no-cache-dir flash-attn==2.7.3 --no-build-isolation || echo "Flash attention kurulumu başarısız, devam ediliyor..."
+# Flash Attention (opsiyonel, hızlandırır) - CUDA 12.1 için
+RUN pip3 install --no-cache-dir flash-attn==2.7.2.post1 --no-build-isolation || echo "Flash attention kurulumu başarısız, devam ediliyor..."
 
 # Uygulama dosyaları
 COPY mtm_batch_ocr.py /app/

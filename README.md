@@ -82,8 +82,9 @@ docker-compose up -d
 ### Ön Gereksinimler
 
 - Python 3.10+
-- CUDA 11.8
+- CUDA 12.1 (veya CUDA 11.8+)
 - NVIDIA GPU (en az 24GB VRAM önerilir)
+- NVIDIA Driver >= 530.30.02
 
 ### Kurulum Adımları
 
@@ -92,17 +93,17 @@ docker-compose up -d
 conda create -n mtm-ocr python=3.10 -y
 conda activate mtm-ocr
 
-# 2. PyTorch kur (CUDA 11.8)
-pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu118
+# 2. PyTorch kur (CUDA 12.1)
+pip install torch==2.4.0 torchvision==0.19.0 --index-url https://download.pytorch.org/whl/cu121
 
 # 3. vLLM kur
-pip install vllm==0.8.5+cu118 --extra-index-url https://wheels.vllm.ai/nightly
+pip install vllm==0.8.5
 
 # 4. Diğer bağımlılıklar
 pip install -r requirements.txt
 
 # 5. Flash Attention (opsiyonel, performans için)
-pip install flash-attn==2.7.3 --no-build-isolation
+pip install flash-attn==2.7.2.post1 --no-build-isolation
 
 # 6. Web UI'ı başlat
 python web_ui.py --host 0.0.0.0 --port 5000
