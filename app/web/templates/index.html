@@ -1065,8 +1065,24 @@
                     </p>
                 </div>
                 
+                <!-- Download Button -->
+                <div style="margin-bottom: 15px; text-align: center;">
+                    <button class="btn" onclick="downloadHighlightedImage('${result.image_filename}')" style="background: #10b981;">
+                        📥 Vurgulu Görseli İndir
+                    </button>
+                    <p style="color: #6b7280; font-size: 13px; margin-top: 8px;">
+                        Kelimeleri kutu içinde vurgulu haliyle indirilir
+                    </p>
+                </div>
+                
+                <!-- Loading Message -->
+                <div id="canvas-loading" style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px;">
+                    <div class="spinner" style="margin: 0 auto 15px;"></div>
+                    <p style="color: #6b7280;">Görsel yükleniyor ve kelimeleri vurgulanıyor...</p>
+                </div>
+                
                 <!-- Canvas -->
-                <div style="text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <div id="canvas-container" style="text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px; display: none;">
                     <canvas id="modal-canvas" style="max-width: 100%; border: 2px solid #e5e7eb; border-radius: 8px;"></canvas>
                 </div>
                 
@@ -1074,63 +1090,153 @@
                 <div style="margin-top: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
                     <p><strong>Görsel Boyutu:</strong> ${result.image_size.width} x ${result.image_size.height} px</p>
                     <p><strong>Tarih:</strong> ${result.timestamp}</p>
+                    <p><strong>Toplam Eşleşme:</strong> ${result.total_matches}</p>
                 </div>
             `;
             
-            // Draw highlighted image on canvas
-            drawHighlightedImageOnCanvas(result, 'modal-canvas');
-            
-            // Show modal
+            // Show modal first
             resultModal.classList.add('active');
+            
+            // Draw highlighted image on canvas (async)
+            setTimeout(() => {
+                drawHighlightedImageOnCanvas(result, 'modal-canvas');
+            }, 100);
         }
         
         function drawHighlightedImageOnCanvas(result, canvasId) {
             const canvas = document.getElementById(canvasId);
+            const canvasContainer = document.getElementById('canvas-container');
+            const loadingDiv = document.getElementById('canvas-loading');
+            
+            if (!canvas) {
+                console.error('Canvas bulunamadı:', canvasId);
+                if (loadingDiv) loadingDiv.innerHTML = '<p style="color: red;">Canvas yüklenemedi</p>';
+                return;
+            }
+            
             const ctx = canvas.getContext('2d');
+            
+            console.log('[DEBUG] Canvas çizimi başlıyor...');
+            console.log('[DEBUG] Image base64 length:', result.image_base64 ? result.image_base64.length : 0);
             
             // Load image from base64
             const img = new Image();
-            img.onload = function() {
-                // Set canvas size
-                const maxWidth = 1100;
-                const scale = Math.min(1, maxWidth / img.width);
-                canvas.width = img.width * scale;
-                canvas.height = img.height * scale;
-                
-                // Draw image
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                // Generate colors for each keyword
-                const keywordColors = {};
-                result.matches.forEach((match, i) => {
-                    const hue = (i * 137.5) % 360;
-                    keywordColors[match.keyword] = `hsl(${hue}, 70%, 50%)`;
-                });
-                
-                // Draw rectangles for each match
-                result.matches.forEach(match => {
-                    const color = keywordColors[match.keyword];
-                    
-                    match.positions.forEach(pos => {
-                        const bbox = pos.bbox;
-                        const x = bbox.x1 * scale;
-                        const y = bbox.y1 * scale;
-                        const width = bbox.width * scale;
-                        const height = bbox.height * scale;
-                        
-                        // Draw thick rectangle border
-                        ctx.strokeStyle = color;
-                        ctx.lineWidth = 4;
-                        ctx.strokeRect(x, y, width, height);
-                        
-                        // Draw semi-transparent fill
-                        ctx.fillStyle = color.replace(')', ', 0.15)').replace('hsl', 'hsla');
-                        ctx.fillRect(x, y, width, height);
-                    });
-                });
+            
+            img.onerror = function(err) {
+                console.error('[ERROR] Görsel yüklenemedi:', err);
+                if (loadingDiv) {
+                    loadingDiv.innerHTML = '<p style="color: red;">❌ Görsel yüklenemedi. Base64 formatı hatalı olabilir.</p>';
+                }
             };
             
-            img.src = result.image_base64;
+            img.onload = function() {
+                console.log('[DEBUG] Görsel yüklendi:', img.width, 'x', img.height);
+                
+                try {
+                    // Set canvas size
+                    const maxWidth = 1100;
+                    const scale = Math.min(1, maxWidth / img.width);
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    
+                    console.log('[DEBUG] Canvas boyutu:', canvas.width, 'x', canvas.height);
+                    
+                    // Draw image
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Generate colors for each keyword
+                    const keywordColors = {};
+                    result.matches.forEach((match, i) => {
+                        const hue = (i * 137.5) % 360;
+                        keywordColors[match.keyword] = `hsl(${hue}, 70%, 50%)`;
+                    });
+                    
+                    // Draw rectangles for each match
+                    let totalBoxes = 0;
+                    result.matches.forEach(match => {
+                        const color = keywordColors[match.keyword];
+                        
+                        match.positions.forEach(pos => {
+                            const bbox = pos.bbox;
+                            const x = bbox.x1 * scale;
+                            const y = bbox.y1 * scale;
+                            const width = bbox.width * scale;
+                            const height = bbox.height * scale;
+                            
+                            // Draw thick rectangle border
+                            ctx.strokeStyle = color;
+                            ctx.lineWidth = 4;
+                            ctx.strokeRect(x, y, width, height);
+                            
+                            // Draw semi-transparent fill
+                            ctx.fillStyle = color.replace(')', ', 0.2)').replace('hsl', 'hsla');
+                            ctx.fillRect(x, y, width, height);
+                            
+                            totalBoxes++;
+                        });
+                    });
+                    
+                    console.log('[DEBUG] Toplam çizilen kutu:', totalBoxes);
+                    
+                    // Hide loading, show canvas
+                    if (loadingDiv) loadingDiv.style.display = 'none';
+                    if (canvasContainer) canvasContainer.style.display = 'block';
+                    
+                    // Store canvas globally for download
+                    window.currentHighlightedCanvas = canvas;
+                    
+                } catch (error) {
+                    console.error('[ERROR] Canvas çizim hatası:', error);
+                    if (loadingDiv) {
+                        loadingDiv.innerHTML = '<p style="color: red;">❌ Canvas çizim hatası: ' + error.message + '</p>';
+                    }
+                }
+            };
+            
+            // Check if base64 has data URL prefix
+            const base64Data = result.image_base64;
+            if (!base64Data) {
+                console.error('[ERROR] Base64 verisi yok!');
+                if (loadingDiv) {
+                    loadingDiv.innerHTML = '<p style="color: red;">❌ Görsel verisi bulunamadı</p>';
+                }
+                return;
+            }
+            
+            // Set image source
+            if (base64Data.startsWith('data:image')) {
+                img.src = base64Data;
+            } else {
+                // Add data URL prefix if missing
+                img.src = 'data:image/jpeg;base64,' + base64Data;
+            }
+        }
+        
+        // Download highlighted image
+        function downloadHighlightedImage(filename) {
+            const canvas = window.currentHighlightedCanvas;
+            
+            if (!canvas) {
+                alert('Görsel henüz yüklenmedi, lütfen bekleyin');
+                return;
+            }
+            
+            try {
+                // Convert canvas to blob
+                canvas.toBlob(function(blob) {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename.replace('.jpg', '_vurgulu.jpg').replace('.png', '_vurgulu.png');
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 'image/jpeg', 0.95);
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('İndirme hatası: ' + error.message);
+            }
         }
         
         // Initial load
