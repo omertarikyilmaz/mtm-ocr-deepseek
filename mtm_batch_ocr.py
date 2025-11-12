@@ -180,9 +180,12 @@ class MTMOCRProcessor:
                             'index': idx
                         })
             except Exception as e:
-                print(f"⚠️ Koordinat parse hatası: {e}")
+                print(f"[WARNING] Koordinat parse hatasi: {e}")
+                print(f"           Word: {word_text[:50]}...")
+                print(f"           Coordinates: {coordinates_str[:100]}...")
                 continue
         
+        print(f"[INFO] Toplam {len(word_positions)} kelime pozisyonu cikarildi")
         return word_positions
     
     def extract_text_only(self, text: str) -> str:
@@ -195,13 +198,18 @@ class MTMOCRProcessor:
         Returns:
             Temiz metin
         """
-        # Tüm ref ve det taglarını temizle
-        pattern = r'<\|ref\|>.*?<\|/ref\|><\|det\|>.*?<\|/det\|>'
-        clean_text = re.sub(pattern, '', text, flags=re.DOTALL)
+        # Ref tagları içindeki metni çıkart
+        pattern = r'<\|ref\|>(.*?)<\|/ref\|>'
+        matches = re.findall(pattern, text, re.DOTALL)
         
-        # Fazla boşlukları temizle
-        clean_text = re.sub(r'\n\n+', '\n\n', clean_text)
-        clean_text = re.sub(r' +', ' ', clean_text)
+        # Tüm kelimeleri birleştir
+        if matches:
+            clean_text = ' '.join(match.strip() for match in matches if match.strip())
+        else:
+            # Eğer ref tagı yoksa, tüm tagları temizle
+            clean_text = re.sub(r'<\|.*?\|>', '', text)
+            clean_text = re.sub(r'\n\n+', '\n\n', clean_text)
+            clean_text = re.sub(r' +', ' ', clean_text)
         
         return clean_text.strip()
     
@@ -382,6 +390,11 @@ class MTMOCRProcessor:
                 
                 # Temiz metni çıkart
                 clean_text = self.extract_text_only(ocr_text)
+                
+                # Debug: OCR output uzunluğunu kontrol et
+                print(f"[DEBUG] OCR output length: {len(ocr_text)} characters")
+                print(f"[DEBUG] Word positions: {len(word_positions)}")
+                print(f"[DEBUG] Clean text length: {len(clean_text)} characters")
                 
                 # JSON sonuç
                 result_data = {
