@@ -773,9 +773,14 @@
         
         // Download file
         function downloadFile(resultId, fileType) {
-            // Basit ve güvenilir yöntem: direkt window.location kullan
-            // Bu yöntem tarayıcı tarafından doğrudan dosya indirme olarak işlenir
-            window.location.href = `/api/download/${resultId}`;
+            console.log('Download başlatılıyor, resultId:', resultId);
+            
+            // Direkt indirme URL'si
+            const downloadUrl = `/api/download/${resultId}`;
+            console.log('Download URL:', downloadUrl);
+            
+            // İndirmeyi başlat
+            window.location.href = downloadUrl;
         }
         
         // Refresh results

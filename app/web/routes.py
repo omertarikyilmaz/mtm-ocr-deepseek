@@ -241,34 +241,43 @@ def get_result(result_id):
 
 @app.route('/api/download/<result_id>')
 def download_result(result_id):
-    """JSON dosyasını indir"""
+    """JSON dosyasını indir - Garantili yöntem"""
     try:
+        from flask import Response
+        
         directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
         filename = f'{result_id}.json'
         file_path = os.path.join(directory, filename)
         
+        print(f"[INFO] Download istegi: result_id={result_id}")
+        print(f"[INFO] Aranan dosya: {file_path}")
+        
         if not os.path.exists(file_path):
             print(f"[HATA] JSON dosyasi bulunamadi: {file_path}")
+            # Klasördeki dosyaları listele (debug için)
+            if os.path.exists(directory):
+                files = os.listdir(directory)
+                print(f"[DEBUG] Klasördeki dosyalar: {files[:5]}")  # İlk 5 dosya
             return jsonify({'error': f'Dosya bulunamadı: {filename}'}), 404
         
-        # Dosyayı gönder
-        try:
-            from flask import send_file
-            return send_file(
-                file_path, 
-                as_attachment=True, 
-                download_name=filename,
-                mimetype='application/json'
-            )
-        except Exception as e:
-            # Fallback: send_from_directory
-            print(f"[UYARI] send_file hatasi, send_from_directory deneniyor: {e}")
-            return send_from_directory(
-                directory, 
-                filename, 
-                as_attachment=True,
-                mimetype='application/json'
-            )
+        # JSON dosyasını oku ve direkt döndür
+        with open(file_path, 'r', encoding='utf-8') as f:
+            json_content = f.read()
+        
+        print(f"[INFO] JSON dosyasi okundu, boyut: {len(json_content)} byte")
+        
+        # Response oluştur
+        response = Response(
+            json_content,
+            mimetype='application/json',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}',
+                'Content-Type': 'application/json; charset=utf-8'
+            }
+        )
+        
+        return response
+        
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
