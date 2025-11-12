@@ -10,7 +10,7 @@ echo ""
 # CUDA kontrolü
 if command -v nvidia-smi &> /dev/null; then
     echo "✅ NVIDIA GPU bulundu:"
-    nvidia-smi --query-gpu=name,memory.total,driver_version,cuda_version --format=csv,noheader
+    nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
 else
     echo "⚠️  NVIDIA GPU bulunamadı! CPU modunda çalışacak (çok yavaş olabilir)"
 fi
