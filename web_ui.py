@@ -217,16 +217,11 @@ def list_results():
             with open(json_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 
-                # Görselleştirme dosyasını bul
-                viz_filename = f"{data['image_filename']}_{data['timestamp']}_boxes.jpg"
-                viz_path = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations', viz_filename)
-                
                 results.append({
                     'id': Path(json_file).stem,
                     'filename': data['image_filename'],
                     'timestamp': data['timestamp'],
                     'word_count': data['word_count'],
-                    'has_visualization': os.path.exists(viz_path),
                     'json_file': os.path.basename(json_file)
                 })
         except Exception as e:
@@ -247,224 +242,25 @@ def get_result(result_id):
         with open(json_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # Görselleştirme URL'i
-        viz_filename = f"{data['image_filename']}_{data['timestamp']}_boxes.jpg"
-        viz_path = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations', viz_filename)
-        
-        data['visualization_url'] = f"/visualization/{viz_filename}" if os.path.exists(viz_path) else None
         
         return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/visualization/<filename>')
-def serve_visualization(filename):
-    """Görselleştirme dosyasını servis et"""
-    viz_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations')
-    return send_from_directory(viz_dir, filename)
 
-@app.route('/api/image/<result_id>')
-@app.route('/original/<result_id>')
-def serve_original_image(result_id):
-    """
-    API: Orijinal görseli servis et
-    PROFESYONEL: Direkt originals klasöründen - kesin çalışır
-    """
-    try:
-        # JSON dosyasını oku
-        json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
-        if not os.path.exists(json_file):
-            return jsonify({'error': 'JSON dosyası bulunamadı'}), 404
-        
-        with open(json_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # STRATEJI 1: image_path direkt kullan (en güvenilir)
-        image_path = data.get('image_path', '')
-        if image_path and os.path.exists(image_path):
-            return send_from_directory(os.path.dirname(image_path), os.path.basename(image_path))
-        
-        # STRATEJI 2: image_filename ile originals klasöründen
-        image_filename = data.get('image_filename', '')
-        if image_filename:
-            originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
-            originals_path = os.path.join(originals_dir, image_filename)
-            if os.path.exists(originals_path):
-                return send_from_directory(originals_dir, image_filename)
-        
-        # STRATEJI 3: image_id ile originals klasöründen (uzantıları dene)
-        image_id = data.get('image_id', '')
-        if image_id:
-            originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
-            for ext in ['jpg', 'jpeg', 'png']:
-                test_filename = f"{image_id}.{ext}"
-                test_path = os.path.join(originals_dir, test_filename)
-                if os.path.exists(test_path):
-                    return send_from_directory(originals_dir, test_filename)
-        
-        # Hata - detaylı log
-        originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
-        originals_files = os.listdir(originals_dir) if os.path.exists(originals_dir) else []
-        print(f"[ERROR] Görsel bulunamadı:")
-        print(f"  - result_id: {result_id}")
-        print(f"  - image_id: {image_id}")
-        print(f"  - image_filename: {image_filename}")
-        print(f"  - image_path: {image_path}")
-        print(f"  - originals_dir: {originals_dir}")
-        print(f"  - originals_exists: {os.path.exists(originals_dir)}")
-        print(f"  - originals_files: {len(originals_files)} dosya")
-        if originals_files:
-            print(f"  - İlk 5 dosya: {originals_files[:5]}")
-        
-        return jsonify({
-            'error': 'Görsel bulunamadı',
-            'result_id': result_id,
-            'image_id': image_id,
-            'image_filename': image_filename,
-            'originals_dir': originals_dir
-        }), 404
-        
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"[ERROR] Görsel servis hatası:\n{error_details}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/generate-boxes/<result_id>', methods=['POST'])
-def generate_boxes(result_id):
-    """Seçilen kelimeler için kutu oluştur"""
-    try:
-        # Seçilen kelimeleri al
-        data = request.get_json()
-        selected_words = data.get('words', [])  # Liste of word texts
-        
-        if not selected_words:
-            return jsonify({'error': 'Kelime seçilmedi'}), 400
-        
-        # JSON dosyasını oku
-        json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
-        if not os.path.exists(json_file):
-            return jsonify({'error': 'Sonuç bulunamadı'}), 404
-        
-        with open(json_file, 'r', encoding='utf-8') as f:
-            result_data = json.load(f)
-        
-        # Seçilen kelimelerin pozisyonlarını filtrele
-        all_words = result_data.get('words', [])
-        filtered_positions = []
-        
-        for word_text in selected_words:
-            # Bu kelimeyi JSON'da bul
-            for word_info in all_words:
-                if word_info['text'] == word_text:
-                    filtered_positions.append(word_info)
-        
-        if not filtered_positions:
-            return jsonify({'error': 'Seçilen kelimeler JSON\'da bulunamadı'}), 404
-        
-        # Orijinal görsel - PROFESYONEL: 3 strateji ile bul
-        original_path = None
-        
-        # STRATEJI 1: image_path direkt kullan
-        image_path = result_data.get('image_path', '')
-        if image_path and os.path.exists(image_path):
-            original_path = image_path
-        
-        # STRATEJI 2: image_filename ile originals klasöründen
-        if not original_path:
-            image_filename = result_data.get('image_filename', '')
-            if image_filename:
-                originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
-                original_path = os.path.join(originals_dir, image_filename)
-                if not os.path.exists(original_path):
-                    original_path = None
-        
-        # STRATEJI 3: image_id ile originals klasöründen (uzantıları dene)
-        if not original_path:
-            image_id = result_data.get('image_id', '')
-            if image_id:
-                originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
-                for ext in ['jpg', 'jpeg', 'png']:
-                    test_path = os.path.join(originals_dir, f"{image_id}.{ext}")
-                    if os.path.exists(test_path):
-                        original_path = test_path
-                        break
-        
-        if not original_path or not os.path.exists(original_path):
-            return jsonify({
-                'error': 'Orijinal görsel bulunamadı',
-                'image_id': result_data.get('image_id', ''),
-                'image_filename': result_data.get('image_filename', ''),
-                'image_path': image_path
-            }), 404
-        
-        # Kutulu görsel oluştur
-        timestamp_str = int(time.time())
-        output_filename = f"{result_id}_selected_{timestamp_str}.jpg"
-        output_path = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations', output_filename)
-        
-        processor = get_or_create_processor()
-        processor.visualize_word_positions(
-            original_path,
-            filtered_positions,
-            output_path,
-            show_text=False,  # Sadece kutu
-            box_width=3  # Kalın çizgi
-        )
-        
-        # Seçilen kelimeleri TXT olarak kaydet
-        txt_filename = f"{result_id}_selected_{timestamp_str}.txt"
-        txt_path = os.path.join(app.config['OUTPUT_FOLDER'], 'results', txt_filename)
-        
-        with open(txt_path, 'w', encoding='utf-8') as f:
-            for word_info in filtered_positions:
-                f.write(word_info['text'] + '\n')
-        
-        return jsonify({
-            'success': True,
-            'image_url': f'/visualization/{output_filename}',
-            'txt_url': f'/download-selected-txt/{txt_filename}',
-            'word_count': len(filtered_positions)
-        })
-        
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"[ERROR] Kutu oluşturma hatası:\n{error_details}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/download-selected-txt/<filename>')
-def download_selected_txt(filename):
-    """Seçilen kelimelerin TXT dosyasını indir"""
-    directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
-    if os.path.exists(os.path.join(directory, filename)):
-        return send_from_directory(directory, filename, as_attachment=True)
-    else:
-        return "Dosya bulunamadı", 404
 
 @app.route('/download/<result_id>/<file_type>')
 def download_result(result_id, file_type):
-    """Sonuçları indir (json veya image)"""
+    """Sonuçları indir (sadece json)"""
     if file_type == 'json':
         directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
         filename = f'{result_id}.json'
-    elif file_type == 'image':
-        # JSON'dan bilgi al
-        json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
-        if os.path.exists(json_file):
-            with open(json_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            directory = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations')
-            filename = f"{data['image_filename']}_{data['timestamp']}_boxes.jpg"
+        if os.path.exists(os.path.join(directory, filename)):
+            return send_from_directory(directory, filename, as_attachment=True)
         else:
             return "Dosya bulunamadı", 404
     else:
-        return "Geçersiz dosya tipi", 400
-    
-    if os.path.exists(os.path.join(directory, filename)):
-        return send_from_directory(directory, filename, as_attachment=True)
-    else:
-        return "Dosya bulunamadı", 404
+        return "Sadece JSON indirilebilir", 400
 
 @app.route('/delete/<result_id>', methods=['DELETE'])
 def delete_result(result_id):
@@ -505,28 +301,20 @@ def delete_all_results():
     """Tüm sonuçları sil"""
     try:
         results_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
-        viz_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations')
         
         deleted_count = 0
         
-        # Results klasöründeki tüm dosyaları sil
+        # Results klasöründeki tüm JSON dosyalarını sil
         if os.path.exists(results_dir):
             for filename in os.listdir(results_dir):
-                file_path = os.path.join(results_dir, filename)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-                    deleted_count += 1
+                if filename.endswith('.json'):
+                    file_path = os.path.join(results_dir, filename)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                        deleted_count += 1
         
-        # Visualizations klasöründeki tüm dosyaları sil
-        if os.path.exists(viz_dir):
-            for filename in os.listdir(viz_dir):
-                file_path = os.path.join(viz_dir, filename)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-                    deleted_count += 1
-        
-        print(f"[INFO] Tum sonuclar silindi: {deleted_count} dosya")
-        return jsonify({'success': True, 'message': f'{deleted_count} dosya silindi'})
+        print(f"[INFO] Tum sonuclar silindi: {deleted_count} JSON dosyasi")
+        return jsonify({'success': True, 'message': f'{deleted_count} JSON dosyasi silindi'})
         
     except Exception as e:
         print(f"[ERROR] Toplu silme hatasi: {e}")

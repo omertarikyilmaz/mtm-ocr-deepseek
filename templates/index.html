@@ -654,10 +654,7 @@
                 resultsGrid.innerHTML = data.results.map(result => `
                     <div class="result-card" onclick="showResult('${result.json_file.replace('.json', '')}')">
                         <div class="result-card-delete" onclick="event.stopPropagation(); deleteResult('${result.json_file.replace('.json', '')}')">×</div>
-                        ${result.has_visualization ? 
-                            `<img src="/visualization/${result.filename}_${result.timestamp}_boxes.jpg" class="result-image" alt="${result.filename}">` :
-                            `<div class="result-image" style="display: flex; align-items: center; justify-content: center; font-size: 48px;">📄</div>`
-                        }
+                        <div class="result-image" style="display: flex; align-items: center; justify-content: center; font-size: 48px;">📄</div>
                         <div class="result-info">
                             <div class="result-title">${result.filename}</div>
                             <div class="result-meta">
@@ -666,10 +663,7 @@
                             </div>
                             <div class="result-actions">
                                 <button class="btn btn-small" onclick="event.stopPropagation(); downloadFile('${result.json_file.replace('.json', '')}', 'json')">
-                                    JSON
-                                </button>
-                                <button class="btn btn-small" onclick="event.stopPropagation(); downloadFile('${result.json_file.replace('.json', '')}', 'image')">
-                                    Görsel
+                                    JSON İndir
                                 </button>
                             </div>
                         </div>
@@ -680,27 +674,15 @@
             }
         }
         
-        // Show result details
-        let currentResultId = null;
-        let selectedWords = new Set();
-        
+        // Show result details - BASIT: Sadece JSON verilerini göster
         async function showResult(resultId) {
             try {
-                currentResultId = resultId;
-                selectedWords.clear();
-                
                 const response = await fetch(`/result/${resultId}`);
                 const data = await response.json();
                 
                 modalTitle.textContent = data.image_filename;
                 
                 modalBody.innerHTML = `
-                    <!-- Orijinal Görsel -->
-                    <div style="margin-bottom: 30px;">
-                        <h3 style="margin-bottom: 15px;">Orijinal Görsel</h3>
-                        <img src="/original/${resultId}" style="width: 100%; border-radius: 8px; margin-bottom: 10px;">
-                    </div>
-                    
                     <!-- İstatistikler -->
                     <h3 style="margin-bottom: 15px;">İstatistikler</h3>
                     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
@@ -711,128 +693,26 @@
                     
                     <!-- Metin -->
                     <h3 style="margin-bottom: 15px;">OCR Metni</h3>
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; margin-bottom: 20px; font-family: monospace;">
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; margin-bottom: 20px; font-family: monospace;">
                         ${data.full_text}
                     </div>
                     
-                    <!-- Kelime Seçimi -->
-                    <h3 style="margin-bottom: 15px;">Kutu Oluşturmak İçin Kelime Seç</h3>
-                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
-                        <p style="margin: 0; color: #856404;">💡 Aşağıdaki kelimelerden istediğinizi seçin. Seçilen kelimelerin pozisyonları kutu içine alınarak yeni bir görsel oluşturulacak.</p>
-                    </div>
-                    
-                    <div id="wordSelector" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                        ${data.words.map((word, idx) => `
-                            <label style="display: inline-block; margin: 5px; padding: 8px 12px; background: #f8f9fa; border: 2px solid #ddd; border-radius: 5px; cursor: pointer; transition: all 0.2s;">
-                                <input type="checkbox" value="${word.text}" data-index="${idx}" style="margin-right: 5px;" onchange="toggleWord(this)">
-                                ${word.text}
-                            </label>
+                    <!-- Kelime Pozisyonları (İlk 100) -->
+                    <h3 style="margin-bottom: 15px;">Kelime Pozisyonları (İlk 100)</h3>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px;">
+                        ${data.words.slice(0, 100).map(word => `
+                            <div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px;">
+                                <strong>"${word.text}"</strong><br>
+                                <span style="color: #666;">Pozisyon: x=${word.bbox.x1}, y=${word.bbox.y1}, w=${word.bbox.width}, h=${word.bbox.height}</span>
+                            </div>
                         `).join('')}
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; justify-content: center;">
-                        <button class="btn" onclick="selectAllWords()">Tümünü Seç</button>
-                        <button class="btn btn-secondary" onclick="clearAllWords()">Seçimi Temizle</button>
-                        <button class="btn" onclick="generateBoxes()" style="background: #28a745;">Kutu Oluştur (0 kelime)</button>
-                    </div>
-                    
-                    <!-- Sonuç Alanı -->
-                    <div id="generatedResult" style="margin-top: 30px; display: none;">
-                        <h3 style="margin-bottom: 15px;">Oluşturulan Görsel</h3>
-                        <img id="generatedImage" style="width: 100%; border-radius: 8px; margin-bottom: 15px;">
-                        <div style="display: flex; gap: 10px; justify-content: center;">
-                            <a id="downloadImage" class="btn" href="#" download>Görseli İndir</a>
-                            <a id="downloadTxt" class="btn" href="#" download>TXT İndir</a>
-                        </div>
+                        ${data.words.length > 100 ? `<p style="text-align: center; color: #999; margin-top: 15px;">... ve ${data.words.length - 100} kelime daha (JSON'da tümünü görebilirsiniz)</p>` : ''}
                     </div>
                 `;
                 
                 resultModal.classList.add('active');
             } catch (error) {
                 alert('Sonuç yükleme hatası: ' + error);
-            }
-        }
-        
-        function toggleWord(checkbox) {
-            const word = checkbox.value;
-            if (checkbox.checked) {
-                selectedWords.add(word);
-            } else {
-                selectedWords.delete(word);
-            }
-            updateGenerateButton();
-        }
-        
-        function selectAllWords() {
-            const checkboxes = document.querySelectorAll('#wordSelector input[type="checkbox"]');
-            checkboxes.forEach(cb => {
-                cb.checked = true;
-                selectedWords.add(cb.value);
-            });
-            updateGenerateButton();
-        }
-        
-        function clearAllWords() {
-            const checkboxes = document.querySelectorAll('#wordSelector input[type="checkbox"]');
-            checkboxes.forEach(cb => {
-                cb.checked = false;
-            });
-            selectedWords.clear();
-            updateGenerateButton();
-        }
-        
-        function updateGenerateButton() {
-            const btn = document.querySelector('button[onclick="generateBoxes()"]');
-            if (btn) {
-                btn.textContent = `Kutu Oluştur (${selectedWords.size} kelime)`;
-                btn.disabled = selectedWords.size === 0;
-                btn.style.opacity = selectedWords.size === 0 ? '0.5' : '1';
-            }
-        }
-        
-        async function generateBoxes() {
-            if (selectedWords.size === 0) {
-                alert('Lütfen en az bir kelime seçin');
-                return;
-            }
-            
-            try {
-                const btn = document.querySelector('button[onclick="generateBoxes()"]');
-                btn.disabled = true;
-                btn.textContent = 'Oluşturuluyor...';
-                
-                const response = await fetch(`/generate-boxes/${currentResultId}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({words: Array.from(selectedWords)})
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Sonucu göster
-                    const resultDiv = document.getElementById('generatedResult');
-                    const img = document.getElementById('generatedImage');
-                    const downloadImg = document.getElementById('downloadImage');
-                    const downloadTxt = document.getElementById('downloadTxt');
-                    
-                    img.src = data.image_url + '?t=' + Date.now();
-                    downloadImg.href = data.image_url;
-                    downloadTxt.href = data.txt_url;
-                    
-                    resultDiv.style.display = 'block';
-                    resultDiv.scrollIntoView({behavior: 'smooth'});
-                    
-                    alert(`Başarılı! ${data.word_count} kelime için kutu oluşturuldu.`);
-                } else {
-                    alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
-                }
-                
-                btn.disabled = false;
-                btn.textContent = `Kutu Oluştur (${selectedWords.size} kelime)`;
-                
-            } catch (error) {
-                alert('Kutu oluşturma hatası: ' + error);
             }
         }
         
