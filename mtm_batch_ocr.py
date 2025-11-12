@@ -169,11 +169,10 @@ class MTMOCRProcessor:
         
         # Eğer grounding formatı yoksa, düz metin olarak parse et
         if format_name == "none":
-            print(f"[WARNING] Grounding formatı yok - Model duz metin donduruyor")
-            print(f"[INFO] Bu normal! Grounding tag olmadan OCR yaptik")
-            print(f"[INFO] Koordinat bilgisi yok ama metin var")
+            print(f"[WARNING] Grounding formatı yok - Model markdown veya duz metin donduruyor")
+            print(f"[INFO] Bu durumda koordinat bilgisi olmayacak")
+            print(f"[INFO] Ama metin raw_ocr_output ve full_text'te olacak")
             # Bu durumda sadece metin var, koordinat yok
-            # Kullanıcıya raw_ocr_output'tan metin göstereceğiz
             return []
         
         for idx, (word_text, coordinates_str) in enumerate(matches):
@@ -305,7 +304,7 @@ class MTMOCRProcessor:
     def process_single_image(
         self,
         image_path: str,
-        prompt: str = "<image>\nRecognize and extract all text from the image, including Turkish characters."
+        prompt: str = "<image>\n<|grounding|>Convert the document to markdown."
     ) -> Dict:
         """
         Tek bir görseli işle
@@ -349,7 +348,7 @@ class MTMOCRProcessor:
     def process_batch(
         self,
         image_paths: List[str],
-        prompt: str = "<image>\nRecognize and extract all text from the image, including Turkish characters.",
+        prompt: str = "<image>\n<|grounding|>Convert the document to markdown.",
         num_workers: int = 32,
         progress_callback: Optional[callable] = None
     ) -> List[Dict]:
