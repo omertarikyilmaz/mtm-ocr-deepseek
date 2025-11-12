@@ -992,10 +992,13 @@
                     });
                     
                     return `
-                        <div style="margin-bottom: 40px; border: 2px solid #e5e7eb; border-radius: 12px; padding: 20px; background: white;">
-                            <h4 style="color: #1f2937; margin-bottom: 10px;">${result.image_filename}</h4>
+                        <div style="margin-bottom: 40px; border: 2px solid #e5e7eb; border-radius: 12px; padding: 20px; background: white; cursor: pointer; transition: all 0.2s;" 
+                             onclick="showHighlightedResult(${idx})"
+                             onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'; this.style.borderColor='#2563eb';"
+                             onmouseout="this.style.boxShadow=''; this.style.borderColor='#e5e7eb';">
+                            <h4 style="color: #1f2937; margin-bottom: 10px;">📄 ${result.image_filename}</h4>
                             <p style="color: #6b7280; font-size: 14px; margin-bottom: 15px;">
-                                ${result.total_matches} eşleşme bulundu
+                                ✅ ${result.total_matches} eşleşme bulundu - <strong>Tıklayarak görselde görün</strong>
                             </p>
                             
                             <!-- Keyword Legend -->
@@ -1007,18 +1010,16 @@
                                 `).join('')}
                             </div>
                             
-                            <!-- Canvas for visualization -->
-                            <div class="search-canvas-container">
-                                <canvas id="canvas-${idx}" class="search-canvas"></canvas>
+                            <!-- Preview Thumbnail -->
+                            <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                                <p style="color: #6b7280; font-size: 14px;">🖼️ Görseli vurgulu olarak görmek için tıklayın</p>
                             </div>
                         </div>
                     `;
                 }).join('');
                 
-                // Draw on canvases
-                data.results.forEach((result, idx) => {
-                    drawHighlightedImage(result, idx);
-                });
+                // Store search results globally for modal
+                window.currentSearchResults = data.results;
                 
             } catch (error) {
                 console.error('Search error:', error);
@@ -1029,15 +1030,69 @@
             }
         }
         
-        function drawHighlightedImage(result, canvasIndex) {
-            const canvas = document.getElementById(`canvas-${canvasIndex}`);
+        // Show highlighted result in modal
+        function showHighlightedResult(resultIndex) {
+            const result = window.currentSearchResults[resultIndex];
+            
+            if (!result) {
+                alert('Sonuç bulunamadı');
+                return;
+            }
+            
+            // Generate colors for keywords
+            const keywordColors = {};
+            result.matches.forEach((match, i) => {
+                const hue = (i * 137.5) % 360;
+                keywordColors[match.keyword] = `hsl(${hue}, 70%, 50%)`;
+            });
+            
+            // Update modal title
+            modalTitle.textContent = `🔍 ${result.image_filename}`;
+            
+            // Update modal body with canvas
+            modalBody.innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 15px;">Bulunan Kelimeler</h3>
+                    <div style="margin-bottom: 15px;">
+                        ${result.matches.map(match => `
+                            <span class="keyword-badge" style="background: ${keywordColors[match.keyword]}; color: white;">
+                                ${match.keyword} (${match.count} eşleşme)
+                            </span>
+                        `).join('')}
+                    </div>
+                    <p style="color: #6b7280; font-size: 14px;">
+                        Toplam ${result.total_matches} eşleşme görselde kutu içinde vurgulanmıştır
+                    </p>
+                </div>
+                
+                <!-- Canvas -->
+                <div style="text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <canvas id="modal-canvas" style="max-width: 100%; border: 2px solid #e5e7eb; border-radius: 8px;"></canvas>
+                </div>
+                
+                <!-- Stats -->
+                <div style="margin-top: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                    <p><strong>Görsel Boyutu:</strong> ${result.image_size.width} x ${result.image_size.height} px</p>
+                    <p><strong>Tarih:</strong> ${result.timestamp}</p>
+                </div>
+            `;
+            
+            // Draw highlighted image on canvas
+            drawHighlightedImageOnCanvas(result, 'modal-canvas');
+            
+            // Show modal
+            resultModal.classList.add('active');
+        }
+        
+        function drawHighlightedImageOnCanvas(result, canvasId) {
+            const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
             
             // Load image from base64
             const img = new Image();
             img.onload = function() {
                 // Set canvas size
-                const maxWidth = 1200;
+                const maxWidth = 1100;
                 const scale = Math.min(1, maxWidth / img.width);
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
@@ -1063,13 +1118,13 @@
                         const width = bbox.width * scale;
                         const height = bbox.height * scale;
                         
-                        // Draw rectangle
+                        // Draw thick rectangle border
                         ctx.strokeStyle = color;
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 4;
                         ctx.strokeRect(x, y, width, height);
                         
                         // Draw semi-transparent fill
-                        ctx.fillStyle = color.replace(')', ', 0.2)').replace('hsl', 'hsla');
+                        ctx.fillStyle = color.replace(')', ', 0.15)').replace('hsl', 'hsla');
                         ctx.fillRect(x, y, width, height);
                     });
                 });
