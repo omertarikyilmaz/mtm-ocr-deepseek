@@ -281,6 +281,39 @@ MIN_CROPS = 2
 MAX_CROPS = 6  # Düşük GPU belleği için 6, yüksek için 9
 ```
 
+## ⚠️ Bilinen Sorunlar / Known Issues
+
+### Pozisyonel Labeling Sorunu (Kritik)
+
+**Durum:** Aktif olarak araştırılıyor 🔍
+
+**Problem:** 
+- DeepSeek-OCR modelinden alınan kelime pozisyonları (x1, y1, x2, y2) tutarsız ve yanlış değerler döndürmektedir.
+- "Locate" (REC) mode kullanılmasına rağmen, bazı kelimelerin bbox koordinatları neredeyse tüm sayfayı kaplayacak şekilde gelmektedir (örn: x1=0, y1=1, x2=329, y2=436 - bir kelime için tüm sayfa yüksekliğinin %99'u).
+- JSON formatında istenen doğru x1, x2, y1, y2 değerleri elde edilememiştir.
+
+**Denenen Çözümler:**
+1. ✅ Free OCR → Locate (REC) mode geçişi yapıldı
+2. ✅ Koordinat dönüşümü (normalize 0-999 → pixel) düzeltildi  
+3. ✅ DeepSeek resmi koduna uygun `x/999*W` formülü uygulandı
+4. 🔄 Debug log'ları eklendi (model response analizi için)
+
+**Mevcut Durum:**
+- OCR metin çıkarma çalışıyor ✅
+- Base64 görsel saklama çalışıyor ✅
+- Kelime pozisyonları **yanlış/kullanılamaz** ❌
+
+**Geçici Çözüm:**
+- Sadece metin çıkarma için kullanılabilir
+- Pozisyon bilgisi gerektiren uygulamalar için **uygun değil**
+
+**Sonraki Adımlar:**
+1. DeepSeek model prompt formatını yeniden değerlendir
+2. Alternatif OCR modellerini araştır (PaddleOCR, TrOCR, GOT-OCR)
+3. Manuel koordinat düzeltme algoritması geliştir
+
+---
+
 ## Sorun Giderme
 
 ### GPU Bellek Hatası (CUDA OOM)
