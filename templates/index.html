@@ -250,6 +250,16 @@
             flex: 1;
         }
         
+        .btn-danger {
+            background: #dc3545;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+        
         .modal {
             display: none;
             position: fixed;
@@ -410,8 +420,13 @@
         
         <!-- Results Section -->
         <div class="card">
-            <h2>📋 İşlenmiş Gazeteler</h2>
-            <button class="btn btn-secondary" id="refreshBtn">🔄 Sonuçları Yenile</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📋 İşlenmiş Gazeteler</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" id="refreshBtn">🔄 Yenile</button>
+                    <button class="btn btn-danger" id="deleteAllBtn">🗑️ Tümünü Sil</button>
+                </div>
+            </div>
             <div id="resultsGrid" class="results-grid"></div>
         </div>
     </div>
@@ -445,6 +460,7 @@
         const progressFill = document.getElementById('progressFill');
         const resultsGrid = document.getElementById('resultsGrid');
         const refreshBtn = document.getElementById('refreshBtn');
+        const deleteAllBtn = document.getElementById('deleteAllBtn');
         const resultModal = document.getElementById('resultModal');
         const modalClose = document.getElementById('modalClose');
         const modalTitle = document.getElementById('modalTitle');
@@ -627,6 +643,9 @@
                                 <button class="btn btn-small" onclick="event.stopPropagation(); downloadFile('${result.json_file.replace('.json', '')}', 'txt')">
                                     TXT ⬇️
                                 </button>
+                                <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteResult('${result.json_file.replace('.json', '')}')">
+                                    🗑️
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -680,6 +699,50 @@
             }
         }
         
+        // Delete single result
+        async function deleteResult(resultId) {
+            if (!confirm('Bu sonucu silmek istediğinizden emin misiniz?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/delete/${resultId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    loadResults();
+                } else {
+                    alert('Silme hatası: ' + (data.error || 'Bilinmeyen hata'));
+                }
+            } catch (error) {
+                alert('Silme hatası: ' + error);
+            }
+        }
+        
+        // Delete all results
+        async function deleteAllResults() {
+            if (!confirm('TÜM sonuçları silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/delete-all', {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    loadResults();
+                } else {
+                    alert('Silme hatası: ' + (data.error || 'Bilinmeyen hata'));
+                }
+            } catch (error) {
+                alert('Silme hatası: ' + error);
+            }
+        }
+        
         // Close modal
         modalClose.addEventListener('click', () => {
             resultModal.classList.remove('active');
@@ -698,6 +761,7 @@
         
         // Refresh results
         refreshBtn.addEventListener('click', loadResults);
+        deleteAllBtn.addEventListener('click', deleteAllResults);
         
         // Initial load
         loadResults();

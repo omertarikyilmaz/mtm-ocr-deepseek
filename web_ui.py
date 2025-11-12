@@ -285,6 +285,73 @@ def download_result(result_id, file_type):
     else:
         return "Dosya bulunamadı", 404
 
+@app.route('/delete/<result_id>', methods=['DELETE'])
+def delete_result(result_id):
+    """Tek bir sonucu sil"""
+    try:
+        results_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
+        viz_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations')
+        
+        # JSON dosyasından bilgi al
+        json_file = os.path.join(results_dir, f'{result_id}.json')
+        if os.path.exists(json_file):
+            with open(json_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # İlgili tüm dosyaları sil
+            files_to_delete = [
+                os.path.join(results_dir, f'{result_id}.json'),
+                os.path.join(results_dir, f'{result_id}.txt'),
+                os.path.join(viz_dir, f"{data['image_filename']}_{data['timestamp']}_boxes.jpg")
+            ]
+            
+            deleted_count = 0
+            for file_path in files_to_delete:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    deleted_count += 1
+            
+            print(f"[INFO] Silindi: {result_id} ({deleted_count} dosya)")
+            return jsonify({'success': True, 'message': f'{deleted_count} dosya silindi'})
+        else:
+            return jsonify({'error': 'Sonuc bulunamadi'}), 404
+            
+    except Exception as e:
+        print(f"[ERROR] Silme hatasi: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/delete-all', methods=['DELETE'])
+def delete_all_results():
+    """Tüm sonuçları sil"""
+    try:
+        results_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
+        viz_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations')
+        
+        deleted_count = 0
+        
+        # Results klasöründeki tüm dosyaları sil
+        if os.path.exists(results_dir):
+            for filename in os.listdir(results_dir):
+                file_path = os.path.join(results_dir, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                    deleted_count += 1
+        
+        # Visualizations klasöründeki tüm dosyaları sil
+        if os.path.exists(viz_dir):
+            for filename in os.listdir(viz_dir):
+                file_path = os.path.join(viz_dir, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                    deleted_count += 1
+        
+        print(f"[INFO] Tum sonuclar silindi: {deleted_count} dosya")
+        return jsonify({'success': True, 'message': f'{deleted_count} dosya silindi'})
+        
+    except Exception as e:
+        print(f"[ERROR] Toplu silme hatasi: {e}")
+        return jsonify({'error': str(e)}), 500
+
 def main():
     """Web sunucusunu başlat"""
     import argparse
