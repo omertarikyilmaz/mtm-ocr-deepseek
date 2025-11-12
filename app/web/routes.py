@@ -247,7 +247,17 @@ def download_result(result_id):
     file_path = os.path.join(directory, filename)
     
     if os.path.exists(file_path):
-        return send_from_directory(directory, filename, as_attachment=True, download_name=filename)
+        try:
+            return send_from_directory(
+                directory, 
+                filename, 
+                as_attachment=True,
+                mimetype='application/json'
+            )
+        except Exception as e:
+            # Eski Flask versiyonları için fallback
+            from flask import send_file
+            return send_file(file_path, as_attachment=True, download_name=filename, mimetype='application/json')
     else:
         print(f"[HATA] JSON dosyasi bulunamadi: {file_path}")
         return jsonify({'error': f'Dosya bulunamadı: {filename}'}), 404
