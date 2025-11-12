@@ -55,6 +55,9 @@ class MTMOCRProcessor:
         
         self.model_path = model_path
         self.output_dir = output_dir
+        # Originals klasörünü oluştur (görselleri saklamak için)
+        self.originals_dir = os.path.join(output_dir, 'originals')
+        os.makedirs(self.originals_dir, exist_ok=True)
         self.crop_mode = crop_mode
         
         # Output dizinlerini oluştur
@@ -515,6 +518,13 @@ class MTMOCRProcessor:
                 image_id = image_path_obj.stem  # Benzersiz ID (uzantısız)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 
+                # Görseli originals klasörüne kopyala (kalıcı saklama)
+                original_saved_path = os.path.join(self.originals_dir, image_filename)
+                if not os.path.exists(original_saved_path):
+                    import shutil
+                    shutil.copy2(img_data['image_path'], original_saved_path)
+                    print(f"[INFO] Gorsel originals klasorune kopyalandi: {image_filename}")
+                
                 # Kelime pozisyonlarını çıkart
                 word_positions = self.extract_word_positions(
                     ocr_text,
@@ -566,7 +576,8 @@ class MTMOCRProcessor:
                 result_data = {
                     'image_id': image_id,  # Benzersiz ID (dosya adı = {id}.jpg)
                     'image_filename': image_filename,  # {id}.jpg
-                    'image_path': img_data['image_path'],
+                    'image_path': original_saved_path,  # Originals klasöründeki yol (kalıcı)
+                    'original_upload_path': img_data['image_path'],  # Orijinal upload yolu (referans için)
                     'timestamp': timestamp,
                     'image_size': {
                         'width': img_data['width'],
