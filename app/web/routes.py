@@ -239,21 +239,26 @@ def get_result(result_id):
 
 
 
-@app.route('/download/<result_id>/<file_type>')
-def download_result(result_id, file_type):
-    """Sonuçları indir (sadece json)"""
-    if file_type == 'json':
-        directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
-        filename = f'{result_id}.json'
-        file_path = os.path.join(directory, filename)
-        
-        if os.path.exists(file_path):
-            return send_from_directory(directory, filename, as_attachment=True)
-        else:
-            print(f"[HATA] JSON dosyasi bulunamadi: {file_path}")
-            return f"Dosya bulunamadı: {result_id}.json", 404
+@app.route('/api/download/<result_id>')
+def download_result(result_id):
+    """JSON dosyasını indir"""
+    directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
+    filename = f'{result_id}.json'
+    file_path = os.path.join(directory, filename)
+    
+    if os.path.exists(file_path):
+        return send_from_directory(directory, filename, as_attachment=True, download_name=filename)
     else:
-        return "Sadece JSON indirilebilir", 400
+        print(f"[HATA] JSON dosyasi bulunamadi: {file_path}")
+        return jsonify({'error': f'Dosya bulunamadı: {filename}'}), 404
+
+@app.route('/download/<result_id>/<file_type>')
+def download_result_old(result_id, file_type):
+    """Eski endpoint - geriye uyumluluk için"""
+    if file_type == 'json':
+        return download_result(result_id)
+    else:
+        return jsonify({'error': 'Sadece JSON indirilebilir'}), 400
 
 @app.route('/delete/<result_id>', methods=['DELETE'])
 def delete_result(result_id):

@@ -773,7 +773,8 @@
         
         // Download file
         function downloadFile(resultId, fileType) {
-            window.location.href = `/download/${resultId}/${fileType}`;
+            // Yeni endpoint: /api/download/{resultId}
+            window.location.href = `/api/download/${resultId}`;
         }
         
         // Refresh results
