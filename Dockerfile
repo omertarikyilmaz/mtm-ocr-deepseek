@@ -53,8 +53,8 @@ COPY DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm/deepencoder/ /app/deepse
 RUN echo 'from .deepseek_ocr import DeepseekOCRForCausalLM' > /app/deepseek_vllm/__init__.py && \
     echo '__all__ = ["DeepseekOCRForCausalLM"]' >> /app/deepseek_vllm/__init__.py
 
-# PYTHONPATH ayarla
-ENV PYTHONPATH="/app:${PYTHONPATH}"
+# PYTHONPATH ayarla (hem /app hem de /app/deepseek_vllm)
+ENV PYTHONPATH="/app:/app/deepseek_vllm:${PYTHONPATH}"
 
 # Diğer bağımlılıklar
 RUN pip3 install --no-cache-dir \
