@@ -343,6 +343,126 @@ def delete_all_results():
         print(f"[HATA] Toplu silme hatasi")
         return jsonify({'error': str(e)}), 500
 
+# ============================================================================
+# KELİME ARAMA VE GÖRSELLEŞTIRME API
+# ============================================================================
+
+@app.route('/api/search/keywords', methods=['POST'])
+def search_keywords():
+    """
+    Birden fazla JSON dosyasında anahtar kelimeleri ara
+    
+    Request: {
+        "keywords": "kelime1, kelime2, kelime3",
+        "result_ids": ["id1", "id2", ...]  // Opsiyonel, boşsa tüm JSON'lar aranır
+    }
+    
+    Response: {
+        "results": [
+            {
+                "result_id": "xxx",
+                "image_filename": "xxx.jpg",
+                "image_base64": "...",
+                "image_size": {"width": 1920, "height": 1080},
+                "matches": [
+                    {
+                        "keyword": "kelime1",
+                        "positions": [
+                            {"text": "kelime1", "bbox": {...}, "index": 0},
+                            {"text": "kelime1", "bbox": {...}, "index": 5}
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+    """
+    try:
+        data = request.get_json()
+        keywords_str = data.get('keywords', '')
+        result_ids = data.get('result_ids', [])
+        
+        # Anahtar kelimeleri parse et (virgülle ayrılmış)
+        keywords = [k.strip().lower() for k in keywords_str.split(',') if k.strip()]
+        
+        if not keywords:
+            return jsonify({'error': 'Anahtar kelime girilmedi'}), 400
+        
+        print(f"[INFO] Kelime arama: {keywords}")
+        print(f"[INFO] Aranacak dosyalar: {result_ids if result_ids else 'Tümü'}")
+        
+        results_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
+        
+        if not os.path.exists(results_dir):
+            return jsonify({'results': []})
+        
+        # JSON dosyalarını belirle
+        if result_ids:
+            json_files = [os.path.join(results_dir, f'{rid}.json') for rid in result_ids]
+            json_files = [f for f in json_files if os.path.exists(f)]
+        else:
+            json_files = glob.glob(os.path.join(results_dir, '*.json'))
+        
+        search_results = []
+        
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                result_id = Path(json_file).stem
+                words = data.get('words', [])
+                
+                # Her anahtar kelime için pozisyonları bul
+                matches = []
+                for keyword in keywords:
+                    positions = []
+                    for word_info in words:
+                        word_text = word_info.get('text', '').lower()
+                        # Tam eşleşme veya kelime içinde geçiyor mu kontrol et
+                        if keyword in word_text:
+                            positions.append(word_info)
+                    
+                    if positions:
+                        matches.append({
+                            'keyword': keyword,
+                            'count': len(positions),
+                            'positions': positions
+                        })
+                
+                # Bu dosyada eşleşme varsa sonuçlara ekle
+                if matches:
+                    search_results.append({
+                        'result_id': result_id,
+                        'image_filename': data.get('image_filename', 'unknown'),
+                        'image_base64': data.get('image_base64', ''),
+                        'image_size': data.get('image_size', {'width': 0, 'height': 0}),
+                        'timestamp': data.get('timestamp', ''),
+                        'total_matches': sum(m['count'] for m in matches),
+                        'matches': matches
+                    })
+            
+            except Exception as e:
+                print(f"[HATA] JSON okuma hatasi: {json_file}, {e}")
+                continue
+        
+        print(f"[INFO] Arama tamamlandi: {len(search_results)} dosyada eslesme bulundu")
+        
+        return jsonify({
+            'success': True,
+            'keywords': keywords,
+            'total_files_searched': len(json_files),
+            'files_with_matches': len(search_results),
+            'results': search_results
+        })
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[HATA] Kelime arama hatasi: {e}")
+        print(error_details)
+        return jsonify({'error': str(e)}), 500
+
 def main():
     """Web sunucusunu başlat"""
     import argparse
