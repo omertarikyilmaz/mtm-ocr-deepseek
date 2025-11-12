@@ -518,12 +518,19 @@ class MTMOCRProcessor:
                 image_id = image_path_obj.stem  # Benzersiz ID (uzantısız)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 
-                # Görseli originals klasörüne kopyala (kalıcı saklama)
+                # Görseli originals klasörüne kopyala (kalıcı saklama) - PROFESYONEL
                 original_saved_path = os.path.join(self.originals_dir, image_filename)
                 if not os.path.exists(original_saved_path):
                     import shutil
-                    shutil.copy2(img_data['image_path'], original_saved_path)
-                    print(f"[INFO] Gorsel originals klasorune kopyalandi: {image_filename}")
+                    try:
+                        shutil.copy2(img_data['image_path'], original_saved_path)
+                        print(f"[SUCCESS] Gorsel originals klasorune kopyalandi: {image_filename}")
+                    except Exception as e:
+                        print(f"[ERROR] Gorsel kopyalama hatasi: {e}")
+                        # Hata olsa bile devam et, image_path upload yolunu kullanır
+                        original_saved_path = img_data['image_path']
+                else:
+                    print(f"[INFO] Gorsel zaten mevcut: {image_filename}")
                 
                 # Kelime pozisyonlarını çıkart
                 word_positions = self.extract_word_positions(

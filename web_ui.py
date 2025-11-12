@@ -263,24 +263,28 @@ def serve_visualization(filename):
     viz_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'visualizations')
     return send_from_directory(viz_dir, filename)
 
+@app.route('/api/image/<result_id>')
 @app.route('/original/<result_id>')
 def serve_original_image(result_id):
-    """Orijinal görseli servis et - originals klasöründen"""
-    json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
-    
-    if not os.path.exists(json_file):
-        return "JSON dosyası bulunamadı", 404
-    
+    """
+    API: Orijinal görseli servis et
+    PROFESYONEL: Direkt originals klasöründen - kesin çalışır
+    """
     try:
+        # JSON dosyasını oku
+        json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
+        if not os.path.exists(json_file):
+            return jsonify({'error': 'JSON dosyası bulunamadı'}), 404
+        
         with open(json_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # Önce originals klasöründen dene (kalıcı saklama)
+        # STRATEJI 1: image_path direkt kullan (en güvenilir)
         image_path = data.get('image_path', '')
         if image_path and os.path.exists(image_path):
             return send_from_directory(os.path.dirname(image_path), os.path.basename(image_path))
         
-        # Fallback: image_filename ile originals klasöründen dene
+        # STRATEJI 2: image_filename ile originals klasöründen
         image_filename = data.get('image_filename', '')
         if image_filename:
             originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
@@ -288,30 +292,43 @@ def serve_original_image(result_id):
             if os.path.exists(originals_path):
                 return send_from_directory(originals_dir, image_filename)
         
-        # Fallback: upload klasöründen dene (eski dosyalar için)
+        # STRATEJI 3: image_id ile originals klasöründen (uzantıları dene)
         image_id = data.get('image_id', '')
-        upload_dir = app.config['UPLOAD_FOLDER']
         if image_id:
+            originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
             for ext in ['jpg', 'jpeg', 'png']:
                 test_filename = f"{image_id}.{ext}"
-                test_path = os.path.join(upload_dir, test_filename)
+                test_path = os.path.join(originals_dir, test_filename)
                 if os.path.exists(test_path):
-                    return send_from_directory(upload_dir, test_filename)
+                    return send_from_directory(originals_dir, test_filename)
         
-        # Hata
-        print(f"[ERROR] Orijinal görsel bulunamadı:")
+        # Hata - detaylı log
+        originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
+        originals_files = os.listdir(originals_dir) if os.path.exists(originals_dir) else []
+        print(f"[ERROR] Görsel bulunamadı:")
         print(f"  - result_id: {result_id}")
         print(f"  - image_id: {image_id}")
         print(f"  - image_filename: {image_filename}")
         print(f"  - image_path: {image_path}")
-        print(f"  - originals_dir: {os.path.join(app.config['OUTPUT_FOLDER'], 'originals')}")
-        return f"Orijinal görsel bulunamadı (image_id: {image_id})", 404
+        print(f"  - originals_dir: {originals_dir}")
+        print(f"  - originals_exists: {os.path.exists(originals_dir)}")
+        print(f"  - originals_files: {len(originals_files)} dosya")
+        if originals_files:
+            print(f"  - İlk 5 dosya: {originals_files[:5]}")
+        
+        return jsonify({
+            'error': 'Görsel bulunamadı',
+            'result_id': result_id,
+            'image_id': image_id,
+            'image_filename': image_filename,
+            'originals_dir': originals_dir
+        }), 404
         
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"[ERROR] Orijinal görsel servis hatası:\n{error_details}")
-        return f"Hata: {str(e)}", 500
+        print(f"[ERROR] Görsel servis hatası:\n{error_details}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/generate-boxes/<result_id>', methods=['POST'])
 def generate_boxes(result_id):
@@ -345,23 +362,41 @@ def generate_boxes(result_id):
         if not filtered_positions:
             return jsonify({'error': 'Seçilen kelimeler JSON\'da bulunamadı'}), 404
         
-        # Orijinal görsel - originals klasöründen bul (kalıcı saklama)
+        # Orijinal görsel - PROFESYONEL: 3 strateji ile bul
+        original_path = None
+        
+        # STRATEJI 1: image_path direkt kullan
         image_path = result_data.get('image_path', '')
         if image_path and os.path.exists(image_path):
             original_path = image_path
-        else:
-            # Fallback: originals klasöründen image_filename ile bul
+        
+        # STRATEJI 2: image_filename ile originals klasöründen
+        if not original_path:
             image_filename = result_data.get('image_filename', '')
             if image_filename:
                 originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
                 original_path = os.path.join(originals_dir, image_filename)
                 if not os.path.exists(original_path):
-                    # Son fallback: upload klasöründen
-                    upload_dir = app.config['UPLOAD_FOLDER']
-                    original_path = os.path.join(upload_dir, image_filename)
-            
-            if not original_path or not os.path.exists(original_path):
-                return jsonify({'error': 'Orijinal görsel bulunamadı'}), 404
+                    original_path = None
+        
+        # STRATEJI 3: image_id ile originals klasöründen (uzantıları dene)
+        if not original_path:
+            image_id = result_data.get('image_id', '')
+            if image_id:
+                originals_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'originals')
+                for ext in ['jpg', 'jpeg', 'png']:
+                    test_path = os.path.join(originals_dir, f"{image_id}.{ext}")
+                    if os.path.exists(test_path):
+                        original_path = test_path
+                        break
+        
+        if not original_path or not os.path.exists(original_path):
+            return jsonify({
+                'error': 'Orijinal görsel bulunamadı',
+                'image_id': result_data.get('image_id', ''),
+                'image_filename': result_data.get('image_filename', ''),
+                'image_path': image_path
+            }), 404
         
         # Kutulu görsel oluştur
         timestamp_str = int(time.time())
