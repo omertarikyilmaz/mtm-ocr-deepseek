@@ -264,19 +264,36 @@ def serve_original_image(result_id):
     json_file = os.path.join(app.config['OUTPUT_FOLDER'], 'results', f'{result_id}.json')
     
     if not os.path.exists(json_file):
-        return "Dosya bulunamadı", 404
+        return "JSON dosyası bulunamadı", 404
     
     try:
         with open(json_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # Orijinal görsel yolu
-        original_path = data.get('image_path', '')
-        if not original_path or not os.path.exists(original_path):
-            return "Orijinal görsel bulunamadı", 404
+        # Önce image_filename'den dene (daha güvenilir)
+        image_filename = data.get('image_filename', '')
+        if image_filename:
+            # Upload klasöründen dene
+            upload_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
+            if os.path.exists(upload_path):
+                return send_from_directory(app.config['UPLOAD_FOLDER'], image_filename)
         
-        return send_from_directory(os.path.dirname(original_path), os.path.basename(original_path))
+        # Fallback: image_path'den dene
+        original_path = data.get('image_path', '')
+        if original_path and os.path.exists(original_path):
+            return send_from_directory(os.path.dirname(original_path), os.path.basename(original_path))
+        
+        # Hata mesajı
+        print(f"[ERROR] Orijinal görsel bulunamadı:")
+        print(f"  - image_filename: {image_filename}")
+        print(f"  - image_path: {original_path}")
+        print(f"  - upload_path: {upload_path if image_filename else 'N/A'}")
+        return f"Orijinal görsel bulunamadı (filename: {image_filename})", 404
+        
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[ERROR] Orijinal görsel servis hatası:\n{error_details}")
         return f"Hata: {str(e)}", 500
 
 @app.route('/generate-boxes/<result_id>', methods=['POST'])

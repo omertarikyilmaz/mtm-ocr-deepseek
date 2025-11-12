@@ -509,8 +509,9 @@ class MTMOCRProcessor:
                 # OCR çıktısı
                 ocr_text = output.outputs[0].text
                 
-                # Dosya adı
-                image_filename = Path(img_data['image_path']).stem
+                # Dosya adı (tam adı, uzantıyla)
+                image_path_obj = Path(img_data['image_path'])
+                image_filename = image_path_obj.name  # Tam dosya adı (uzantıyla)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 
                 # Kelime pozisyonlarını çıkart
