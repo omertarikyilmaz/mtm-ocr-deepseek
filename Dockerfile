@@ -38,14 +38,23 @@ RUN pip3 install --no-cache-dir \
     torchaudio==2.4.0 \
     --index-url https://download.pytorch.org/whl/cu121
 
-# DeepSeek OCR kodu
-COPY DeepSeek-OCR/ /app/DeepSeek-OCR/
-
-# __init__.py oluştur (modül import için gerekli)
-RUN echo 'from .deepseek_ocr import DeepseekOCRForCausalLM\n__all__ = ["DeepseekOCRForCausalLM"]' > /app/DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm/__init__.py
-
 # vLLM kurulumu (CUDA 12.1 uyumlu)
 RUN pip3 install --no-cache-dir vllm==0.8.5
+
+# DeepSeek OCR kodu - önce dizinleri oluştur
+RUN mkdir -p /app/deepseek_vllm/process /app/deepseek_vllm/deepencoder
+
+# DeepSeek-OCR-vllm dosyalarını kopyala
+COPY DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm/*.py /app/deepseek_vllm/
+COPY DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm/process/ /app/deepseek_vllm/process/
+COPY DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm/deepencoder/ /app/deepseek_vllm/deepencoder/
+
+# __init__.py oluştur
+RUN echo 'from .deepseek_ocr import DeepseekOCRForCausalLM' > /app/deepseek_vllm/__init__.py && \
+    echo '__all__ = ["DeepseekOCRForCausalLM"]' >> /app/deepseek_vllm/__init__.py
+
+# PYTHONPATH ayarla
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 # Diğer bağımlılıklar
 RUN pip3 install --no-cache-dir \

@@ -26,15 +26,9 @@ from vllm import LLM, SamplingParams
 from vllm.model_executor.models.registry import ModelRegistry
 
 # Import local modules
-# DeepSeek-OCR modülünü Python path'ine ekle
-import sys
-deepseek_vllm_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm')
-if deepseek_vllm_path not in sys.path:
-    sys.path.insert(0, deepseek_vllm_path)
-
-from deepseek_ocr import DeepseekOCRForCausalLM
-from process.ngram_norepeat import NoRepeatNGramLogitsProcessor
-from process.image_process import DeepseekOCRProcessor
+from deepseek_vllm.deepseek_ocr import DeepseekOCRForCausalLM
+from deepseek_vllm.process.ngram_norepeat import NoRepeatNGramLogitsProcessor
+from deepseek_vllm.process.image_process import DeepseekOCRProcessor
 
 ModelRegistry.register_model("DeepseekOCRForCausalLM", DeepseekOCRForCausalLM)
 
