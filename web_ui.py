@@ -157,7 +157,9 @@ def process_images():
                 processing_status['progress'] = current
                 processing_status['total'] = total
                 processing_status['status_message'] = f'{message} ({current}/{total})'
-                print(f"📊 Progress: {current}/{total} - {message}")
+                # Sadece önemli milestone'larda log yaz
+                if current == 0 or current == total or current % max(1, total // 10) == 0:
+                    print(f"📊 Progress: {current}/{total} - {message}")
             
             results = processor.process_batch(
                 image_paths,
@@ -291,6 +293,7 @@ def main():
     parser.add_argument('--host', type=str, default='0.0.0.0', help='Host adresi')
     parser.add_argument('--port', type=int, default=5000, help='Port numarası')
     parser.add_argument('--debug', action='store_true', help='Debug modu')
+    parser.add_argument('--preload-model', action='store_true', default=True, help='Model başlangıçta yüklensin')
     
     args = parser.parse_args()
     
@@ -303,9 +306,19 @@ def main():
     🌐 URL: http://{args.host}:{args.port}
     📁 Upload: {app.config['UPLOAD_FOLDER']}
     📁 Output: {app.config['OUTPUT_FOLDER']}
-    
-    Tarayıcınızda açın: http://localhost:{args.port}
     """)
+    
+    # Model'i başlangıçta yükle (kullanıcı beklemesin)
+    if args.preload_model:
+        print("    🚀 Model yükleniyor...")
+        try:
+            get_or_create_processor()
+            print("    ✅ Model hazır! Kullanıcılar bekleme yapmadan OCR yapabilir.\n")
+        except Exception as e:
+            print(f"    ⚠️  Model yükleme hatası: {e}")
+            print("    ℹ️  Model ilk kullanımda yüklenecek.\n")
+    
+    print(f"    Tarayıcınızda açın: http://localhost:{args.port}\n")
     
     app.run(
         host=args.host,

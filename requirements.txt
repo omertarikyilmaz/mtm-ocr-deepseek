@@ -33,9 +33,6 @@ numpy>=1.21.0
 flask>=2.0.0
 flask-cors>=3.0.0
 
-# Progress bars
-tqdm>=4.62.0
-
 # Flash Attention (Opsiyonel - performans için)
 # pip install flash-attn==2.7.2.post1 --no-build-isolation
 # flash-attn==2.7.2.post1

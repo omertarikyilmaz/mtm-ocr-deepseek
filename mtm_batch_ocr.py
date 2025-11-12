@@ -12,7 +12,6 @@ from typing import List, Dict, Tuple, Optional
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
 
 import torch
 if torch.version.cuda == '11.8':
@@ -303,14 +302,12 @@ class MTMOCRProcessor:
         # Görselleri paralel olarak hazırla
         print("🔄 Görseller hazırlanıyor...")
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            processed_images = list(tqdm(
+            processed_images = list(
                 executor.map(
                     lambda p: self.process_single_image(p, prompt),
                     image_paths
-                ),
-                total=len(image_paths),
-                desc="Görsel hazırlama"
-            ))
+                )
+            )
         
         # None değerleri filtrele
         processed_images = [img for img in processed_images if img is not None]
