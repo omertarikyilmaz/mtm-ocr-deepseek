@@ -290,7 +290,7 @@ class MTMOCRProcessor:
     def process_single_image(
         self,
         image_path: str,
-        prompt: str = "<image>\n<|grounding|>\nFree OCR.",
+        prompt: str = "<image>\nFree OCR.",
         use_word_location: bool = True
     ) -> Dict:
         """
@@ -451,7 +451,7 @@ class MTMOCRProcessor:
     def process_batch(
         self,
         image_paths: List[str],
-        prompt: str = "<image>\n<|grounding|>\nFree OCR.",
+        prompt: str = "<image>\nFree OCR.",
         num_workers: int = 32,
         progress_callback: Optional[callable] = None,
         use_word_location: bool = False  # Free OCR bbox'larını kullan
