@@ -772,31 +772,10 @@
         });
         
         // Download file
-        async function downloadFile(resultId, fileType) {
-            try {
-                // Yeni endpoint: /api/download/{resultId}
-                const response = await fetch(`/api/download/${resultId}`);
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    alert('İndirme hatası: ' + (errorData.error || 'Bilinmeyen hata'));
-                    return;
-                }
-                
-                // Blob olarak indir
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${resultId}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            } catch (error) {
-                console.error('Download error:', error);
-                alert('İndirme hatası: ' + error);
-            }
+        function downloadFile(resultId, fileType) {
+            // Basit ve güvenilir yöntem: direkt window.location kullan
+            // Bu yöntem tarayıcı tarafından doğrudan dosya indirme olarak işlenir
+            window.location.href = `/api/download/${resultId}`;
         }
         
         // Refresh results

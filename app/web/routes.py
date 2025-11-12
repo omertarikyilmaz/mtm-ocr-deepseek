@@ -242,25 +242,39 @@ def get_result(result_id):
 @app.route('/api/download/<result_id>')
 def download_result(result_id):
     """JSON dosyasını indir"""
-    directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
-    filename = f'{result_id}.json'
-    file_path = os.path.join(directory, filename)
-    
-    if os.path.exists(file_path):
+    try:
+        directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
+        filename = f'{result_id}.json'
+        file_path = os.path.join(directory, filename)
+        
+        if not os.path.exists(file_path):
+            print(f"[HATA] JSON dosyasi bulunamadi: {file_path}")
+            return jsonify({'error': f'Dosya bulunamadı: {filename}'}), 404
+        
+        # Dosyayı gönder
         try:
+            from flask import send_file
+            return send_file(
+                file_path, 
+                as_attachment=True, 
+                download_name=filename,
+                mimetype='application/json'
+            )
+        except Exception as e:
+            # Fallback: send_from_directory
+            print(f"[UYARI] send_file hatasi, send_from_directory deneniyor: {e}")
             return send_from_directory(
                 directory, 
                 filename, 
                 as_attachment=True,
                 mimetype='application/json'
             )
-        except Exception as e:
-            # Eski Flask versiyonları için fallback
-            from flask import send_file
-            return send_file(file_path, as_attachment=True, download_name=filename, mimetype='application/json')
-    else:
-        print(f"[HATA] JSON dosyasi bulunamadi: {file_path}")
-        return jsonify({'error': f'Dosya bulunamadı: {filename}'}), 404
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"[HATA] Download endpoint hatasi: {e}")
+        print(error_details)
+        return jsonify({'error': f'İndirme hatası: {str(e)}'}), 500
 
 @app.route('/download/<result_id>/<file_type>')
 def download_result_old(result_id, file_type):
