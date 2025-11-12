@@ -16,9 +16,17 @@ import threading
 from app.core import MTMOCRProcessor
 
 app = Flask(__name__, template_folder='templates')
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['OUTPUT_FOLDER'] = 'output'
+
+# Absolute path kullan - Docker ve manuel çalışma için
+# Uygulama kök dizini: /app/ (Docker) veya proje root (Manuel)
+APP_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+app.config['UPLOAD_FOLDER'] = os.path.join(APP_ROOT, 'uploads')
+app.config['OUTPUT_FOLDER'] = os.path.join(APP_ROOT, 'output')
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max dosya boyutu
+
+print(f"[INFO] APP_ROOT: {APP_ROOT}")
+print(f"[INFO] UPLOAD_FOLDER: {app.config['UPLOAD_FOLDER']}")
+print(f"[INFO] OUTPUT_FOLDER: {app.config['OUTPUT_FOLDER']}")
 
 # Klasörleri oluştur
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
