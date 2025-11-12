@@ -252,52 +252,100 @@ class MTMOCRProcessor:
     
     def visualize_word_positions(
         self,
-        image: Image.Image,
+        image_path: str,
         word_positions: List[Dict],
-        output_path: str
+        output_path: str,
+        show_text: bool = True,
+        box_color: tuple = None,
+        box_width: int = 2
     ) -> Image.Image:
         """
-        Kelime pozisyonlarını görsel üzerine çiz
+        JSON'dan alınan kelime pozisyonlarını görsel üzerinde göster
+        DeepSeek'ten bağımsız, kendi kutu çizme sistemimiz
         
         Args:
-            image: Orijinal görsel
-            word_positions: Kelime pozisyon bilgileri
+            image_path: Orijinal görsel yolu
+            word_positions: JSON'dan gelen kelime pozisyonları
             output_path: Çıktı dosya yolu
+            show_text: Kutunun üstünde metni göster
+            box_color: Kutu rengi (None ise rastgele)
+            box_width: Kutu çizgi kalınlığı
             
         Returns:
             Bounding box'lı görsel
         """
+        print(f"[INFO] Gorsel uzerine {len(word_positions)} kelime icin kutu ciziliyor...")
+        
+        # Orijinal görseli yükle
+        image = Image.open(image_path).convert('RGB')
         img_draw = image.copy()
-        draw = ImageDraw.Draw(img_draw)
         
-        # Yarı saydam overlay
-        overlay = Image.new('RGBA', img_draw.size, (0, 0, 0, 0))
-        draw2 = ImageDraw.Draw(overlay)
+        # Draw objesi oluştur
+        draw = ImageDraw.Draw(img_draw, 'RGBA')
         
-        for word_info in word_positions:
+        # Font yükle
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+        except:
+            font = ImageFont.load_default()
+        
+        # Her kelime için kutu çiz
+        for idx, word_info in enumerate(word_positions):
             try:
                 bbox = word_info['bbox']
-                text = word_info['text']
+                text = word_info.get('text', '')
                 
-                # Rastgele renk
-                color = (
-                    np.random.randint(50, 200),
-                    np.random.randint(50, 200),
-                    np.random.randint(50, 200)
-                )
-                color_alpha = color + (30,)
+                # Renk belirle
+                if box_color:
+                    color = box_color
+                else:
+                    # Her kelime için farklı renk (ama okunabilir)
+                    hue = (idx * 137.5) % 360  # Golden angle
+                    import colorsys
+                    rgb = colorsys.hsv_to_rgb(hue/360, 0.7, 0.9)
+                    color = tuple(int(c * 255) for c in rgb)
                 
-                # Bounding box çiz
-                x1, y1, x2, y2 = bbox['x1'], bbox['y1'], bbox['x2'], bbox['y2']
-                draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
-                draw2.rectangle([x1, y1, x2, y2], fill=color_alpha)
+                # Koordinatlar
+                x1, y1 = bbox['x1'], bbox['y1']
+                x2, y2 = bbox['x2'], bbox['y2']
+                
+                # Kutuyu çiz
+                draw.rectangle([x1, y1, x2, y2], outline=color, width=box_width)
+                
+                # Yarı saydam dolgu
+                overlay = Image.new('RGBA', img_draw.size, (0, 0, 0, 0))
+                overlay_draw = ImageDraw.Draw(overlay)
+                overlay_draw.rectangle([x1, y1, x2, y2], fill=color + (30,))
+                img_draw = Image.alpha_composite(img_draw.convert('RGBA'), overlay).convert('RGB')
+                
+                # Metin göster
+                if show_text and text:
+                    # Metin için arka plan
+                    text_bbox = draw.textbbox((0, 0), text, font=font)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_height = text_bbox[3] - text_bbox[1]
+                    
+                    # Metin pozisyonu (kutunun üstünde)
+                    text_x = x1
+                    text_y = max(0, y1 - text_height - 2)
+                    
+                    # Arka plan çiz
+                    draw = ImageDraw.Draw(img_draw)
+                    draw.rectangle(
+                        [text_x, text_y, text_x + text_width + 4, text_y + text_height + 2],
+                        fill=(255, 255, 255, 200)
+                    )
+                    
+                    # Metni çiz
+                    draw.text((text_x + 2, text_y), text, fill=color, font=font)
                 
             except Exception as e:
-                print(f"⚠️ Çizim hatası: {e}")
+                print(f"[WARNING] Kutu cizim hatasi ({idx}): {e}")
                 continue
         
-        img_draw.paste(overlay, (0, 0), overlay)
-        img_draw.save(output_path)
+        # Kaydet
+        img_draw.save(output_path, quality=95)
+        print(f"[SUCCESS] Gorsel kaydedildi: {output_path}")
         
         return img_draw
     
@@ -565,16 +613,18 @@ class MTMOCRProcessor:
                 
                 # TXT dosyası artık kaydedilmiyor - her şey JSON'da
                 
-                # Görselleştirme
+                # Görselleştirme - BİZ ÇİZİYORUZ (DeepSeek değil!)
                 viz_path = os.path.join(
                     self.output_dir,
                     'visualizations',
                     f'{image_filename}_{timestamp}_boxes.jpg'
                 )
                 self.visualize_word_positions(
-                    img_data['image'],
+                    img_data['image_path'],  # Orijinal görsel yolu
                     word_positions,
-                    viz_path
+                    viz_path,
+                    show_text=True,  # Kelimeyi göster
+                    box_width=2  # İnce çizgi
                 )
                 
                 results.append(result_data)
