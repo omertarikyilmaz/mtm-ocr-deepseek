@@ -1,3 +1,6 @@
+# Alternatif docker-compose.yml (nvidia runtime hatası için)
+# Kullanım: docker-compose -f docker-compose.nvidia-fix.yml up -d
+
 version: '3.8'
 
 services:
@@ -8,7 +11,7 @@ services:
     image: mtm-ocr:latest
     container_name: mtm-ocr-app
     
-    # GPU erişimi (Modern Docker Compose sözdizimi)
+    # GPU erişimi - Alternatif 1: Modern sözdizimi (Docker Compose v1.28+)
     deploy:
       resources:
         reservations:
@@ -34,11 +37,8 @@ services:
       
       # Upload dosyaları için
       - ./uploads:/app/uploads
-      
-      # (Opsiyonel) Yerel model kullanmak için
-      # - /path/to/your/model:/app/local-model:ro
     
-    # Bellek limitleri (isteğe göre ayarlayın)
+    # Bellek limitleri
     shm_size: '8gb'
     
     # Restart policy
@@ -51,20 +51,4 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-
-# Kullanım:
-# 1. İlk çalıştırma (build ve start):
-#    docker-compose up -d
-#
-# 2. Logları görüntüleme:
-#    docker-compose logs -f
-#
-# 3. Durdurma:
-#    docker-compose down
-#
-# 4. Yeniden build:
-#    docker-compose build --no-cache
-#
-# 5. Container'a giriş:
-#    docker-compose exec mtm-ocr bash
 
