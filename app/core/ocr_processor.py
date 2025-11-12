@@ -357,6 +357,10 @@ class MTMOCRProcessor:
                     output = self.llm.generate([cache_item], sampling_params=self.sampling_params)[0]
                     response = output.outputs[0].text
                     
+                    # DEBUG: İlk 3 kelime için response'u göster
+                    if len(word_locations) < 3:
+                        print(f"[DEBUG] '{word}' için DeepSeek response: {response[:200]}...")
+                    
                     # Response formatı: <|det|>[[x1,y1,x2,y2]]<|/det|>
                     pattern = r'<\|det\|>(.*?)<\|/det\|>'
                     coords_match = re.search(pattern, response)
@@ -370,6 +374,11 @@ class MTMOCRProcessor:
                             bbox = coords[0] if isinstance(coords[0], list) else coords
                             
                             if len(bbox) >= 4:
+                                # DEBUG: İlk 3 kelime için normalize ve pixel değerleri göster
+                                if len(word_locations) < 3:
+                                    print(f"[DEBUG] '{word}' normalize bbox: {bbox}")
+                                    print(f"[DEBUG] Görsel boyutu: {image_width}x{image_height}")
+                                
                                 # DeepSeek OCR HER ZAMAN 0-999 arası normalize döndürür!
                                 # Resmi kod: x1 = int(x1 / 999 * image_width)
                                 # modeling_deepseekocr.py satır 104-108
@@ -377,6 +386,10 @@ class MTMOCRProcessor:
                                 y1 = int(bbox[1] / 999 * image_height)
                                 x2 = int(bbox[2] / 999 * image_width)
                                 y2 = int(bbox[3] / 999 * image_height)
+                                
+                                # DEBUG: İlk 3 kelime için pixel değerleri göster
+                                if len(word_locations) < 3:
+                                    print(f"[DEBUG] '{word}' pixel bbox: x1={x1}, y1={y1}, x2={x2}, y2={y2}, w={x2-x1}, h={y2-y1}")
                                 
                                 # Lowercase key kullan (arama kolaylığı için)
                                 word_lower = word.lower()
@@ -524,6 +537,14 @@ class MTMOCRProcessor:
                     )
                     
                     print(f"[INFO] Locate mode'dan {len(word_locations)} kelime pozisyonu bulundu")
+                    
+                    # DEBUG: İlk 3 kelimenin bbox'larını göster
+                    if word_locations:
+                        print(f"[DEBUG] İlk 3 kelime lokasyonu:")
+                        for word, data in list(word_locations.items())[:3]:
+                            print(f"  '{word}': {data['bbox']}")
+                    else:
+                        print(f"[UYARI] Locate mode hiç kelime bulamadı! Free OCR bbox'ları kullanılacak.")
                     
                     # Orijinal sırayla word_positions oluştur
                     word_positions = []
