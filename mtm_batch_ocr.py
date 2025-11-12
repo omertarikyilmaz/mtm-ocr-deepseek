@@ -510,27 +510,34 @@ class MTMOCRProcessor:
                 if use_word_location and len(word_positions) < 20:  # Eğer az kelime varsa (paragraf seviyesi)
                     print(f"[INFO] Grounding yetersiz ({len(word_positions)} item), LOCATE modu baslatiliyor...")
                     
-                    # Metinden kelimeleri ayır
-                    words = clean_text.split()
-                    words = [w.strip('.,!?;:()[]{}\"\'') for w in words if len(w.strip('.,!?;:()[]{}\"\'')) > 0]
-                    words = list(set(words))  # Tekrarları kaldır
+                    # Metinden kelimeleri ayır - OKUNUS SIRASINA GORE
+                    all_words = clean_text.split()
+                    all_words = [w.strip('.,!?;:()[]{}\"\'') for w in all_words if len(w.strip('.,!?;:()[]{}\"\'')) > 0]
                     
-                    print(f"[INFO] {len(words)} benzersiz kelime bulundu")
+                    # Benzersiz kelimeleri al AMA sırayı koru
+                    seen = set()
+                    unique_words = []
+                    for word in all_words:
+                        if word not in seen:
+                            seen.add(word)
+                            unique_words.append(word)
                     
-                    # Her kelime için koordinat bul
-                    word_locations = self.locate_words_in_image(img_data['image_path'], words, batch_size=5)
+                    print(f"[INFO] {len(unique_words)} benzersiz kelime bulundu (toplam {len(all_words)} kelime)")
                     
-                    # word_positions array'ini oluştur
+                    # Her kelime için koordinat bul - BATCH SIZE 20
+                    word_locations = self.locate_words_in_image(img_data['image_path'], unique_words, batch_size=20)
+                    
+                    # word_positions array'ini oluştur - OKUNUS SIRASINA GORE
                     word_positions = []
-                    for word_text in words:
+                    for idx, word_text in enumerate(all_words):
                         if word_text in word_locations:
                             word_positions.append({
                                 'text': word_text,
                                 'bbox': word_locations[word_text]['bbox'],
-                                'index': len(word_positions)
+                                'index': idx  # Okunus sırasına göre index
                             })
                     
-                    print(f"[SUCCESS] LOCATE ile {len(word_positions)} kelimenin koordinati alindi!")
+                    print(f"[SUCCESS] LOCATE ile {len(word_positions)} kelimenin koordinati alindi (okunus sirasinda)!")
                 
                 # JSON sonuç
                 result_data = {
