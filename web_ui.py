@@ -272,23 +272,36 @@ def serve_original_image(result_id):
         
         # Önce image_filename'den dene (daha güvenilir)
         image_filename = data.get('image_filename', '')
+        
+        # Eğer uzantı yoksa, yaygın uzantıları dene
         if image_filename:
-            # Upload klasöründen dene
             upload_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
             if os.path.exists(upload_path):
                 return send_from_directory(app.config['UPLOAD_FOLDER'], image_filename)
+            
+            # Uzantı yoksa, yaygın uzantıları dene
+            if '.' not in image_filename:
+                for ext in ['jpg', 'jpeg', 'png']:
+                    test_filename = f"{image_filename}.{ext}"
+                    test_path = os.path.join(app.config['UPLOAD_FOLDER'], test_filename)
+                    if os.path.exists(test_path):
+                        return send_from_directory(app.config['UPLOAD_FOLDER'], test_filename)
         
         # Fallback: image_path'den dene
         original_path = data.get('image_path', '')
         if original_path and os.path.exists(original_path):
             return send_from_directory(os.path.dirname(original_path), os.path.basename(original_path))
         
-        # Hata mesajı
+        # Hata mesajı (detaylı debug)
+        upload_dir = app.config['UPLOAD_FOLDER']
+        upload_files = os.listdir(upload_dir) if os.path.exists(upload_dir) else []
         print(f"[ERROR] Orijinal görsel bulunamadı:")
         print(f"  - image_filename: {image_filename}")
         print(f"  - image_path: {original_path}")
-        print(f"  - upload_path: {upload_path if image_filename else 'N/A'}")
-        return f"Orijinal görsel bulunamadı (filename: {image_filename})", 404
+        print(f"  - upload_dir: {upload_dir}")
+        print(f"  - upload_dir exists: {os.path.exists(upload_dir)}")
+        print(f"  - upload_files (first 5): {upload_files[:5]}")
+        return f"Orijinal görsel bulunamadı (filename: {image_filename}, upload_dir: {upload_dir})", 404
         
     except Exception as e:
         import traceback
