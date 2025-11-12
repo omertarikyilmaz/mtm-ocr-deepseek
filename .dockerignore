@@ -33,7 +33,10 @@ models/
 !README.md
 
 # Docker
-docker/
+docker/*
+!docker/docker-entrypoint.sh
+!docker/Dockerfile
+!docker/docker-compose.yml
 
 # Logs
 *.log
