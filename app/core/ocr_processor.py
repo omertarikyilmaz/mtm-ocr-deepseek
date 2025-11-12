@@ -444,14 +444,8 @@ class MTMOCRProcessor:
                 image_id = image_path_obj.stem  # Benzersiz ID (uzantısız)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 
-                # Görseli originals klasörüne kopyala (kalıcı saklama) - PROFESYONEL
-                original_saved_path = os.path.join(self.originals_dir, image_filename)
-                if not os.path.exists(original_saved_path):
-                    import shutil
-                    try:
-                        shutil.copy2(img_data['image_path'], original_saved_path)
-                    except Exception as e:
-                        original_saved_path = img_data['image_path']
+                # Yüklenen görsel yolu (uploads klasöründeki orijinal)
+                original_upload_path = img_data['image_path']
                 
                 # Kelime pozisyonlarını çıkart
                 word_positions = self.extract_word_positions(
@@ -463,14 +457,22 @@ class MTMOCRProcessor:
                 # Temiz metni çıkart
                 clean_text = self.extract_text_only(ocr_text)
                 
-                # Görseli base64 olarak oku
+                # Görseli base64 olarak oku - YUKLENEN GORSELI DIREKT AL
                 image_base64 = None
                 try:
-                    with open(img_data['image_path'], 'rb') as img_file:
-                        image_data = img_file.read()
-                        image_base64 = base64.b64encode(image_data).decode('utf-8')
+                    # Yüklenen görseli direkt al (img_data['image_path'] = uploads/{unique_id}.jpg)
+                    upload_image_path = img_data['image_path']
+                    if os.path.exists(upload_image_path):
+                        with open(upload_image_path, 'rb') as img_file:
+                            image_data = img_file.read()
+                            image_base64 = base64.b64encode(image_data).decode('utf-8')
+                            print(f"[INFO] Gorsel base64'e cevrildi: {upload_image_path}")
+                    else:
+                        print(f"[HATA] Gorsel bulunamadi: {upload_image_path}")
                 except Exception as e:
-                    print(f"[UYARI] Gorsel base64'e cevrilemedi: {e}")
+                    print(f"[HATA] Gorsel base64'e cevrilemedi: {e}")
+                    import traceback
+                    print(traceback.format_exc())
                 
                 if use_word_location and len(word_positions) < 20:
                     all_words = clean_text.split()
@@ -498,8 +500,7 @@ class MTMOCRProcessor:
                 result_data = {
                     'image_id': image_id,
                     'image_filename': image_filename,
-                    'image_path': original_saved_path,
-                    'original_upload_path': img_data['image_path'],
+                    'image_path': original_upload_path,
                     'timestamp': timestamp,
                     'image_size': {
                         'width': img_data['width'],
@@ -511,6 +512,12 @@ class MTMOCRProcessor:
                     'raw_ocr_output': ocr_text,
                     'image_base64': image_base64
                 }
+                
+                # Base64 kontrolü
+                if image_base64 is None:
+                    print(f"[HATA] image_base64 None! Gorsel: {original_upload_path}")
+                else:
+                    print(f"[INFO] image_base64 hazir, uzunluk: {len(image_base64)} karakter")
                 
                 # JSON dosyasını kaydet (result_id ile)
                 json_filename = f'{image_id}.json'
