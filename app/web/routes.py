@@ -205,7 +205,8 @@ def list_results():
             with open(json_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 
-                result_id = Path(json_file).stem
+                # JSON içindeki image_id'yi kullan (dosya adından değil)
+                result_id = data.get('image_id', Path(json_file).stem)
                 results.append({
                     'id': result_id,
                     'filename': data['image_filename'],
@@ -243,11 +244,42 @@ def download_result(result_id, file_type):
     """Sonuçları indir (sadece json)"""
     if file_type == 'json':
         directory = os.path.join(app.config['OUTPUT_FOLDER'], 'results')
+        
+        # Önce image_id.json formatını dene
         filename = f'{result_id}.json'
-        if os.path.exists(os.path.join(directory, filename)):
+        file_path = os.path.join(directory, filename)
+        
+        # Eğer bulunamazsa, tüm JSON dosyalarını kontrol et
+        if not os.path.exists(file_path):
+            json_files = glob.glob(os.path.join(directory, '*.json'))
+            found = False
+            for json_file in json_files:
+                try:
+                    with open(json_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        # JSON içindeki image_id ile karşılaştır
+                        if data.get('image_id') == result_id:
+                            filename = os.path.basename(json_file)
+                            file_path = os.path.join(directory, filename)
+                            found = True
+                            break
+                except:
+                    continue
+            
+            # Hala bulunamazsa, dosya adından dene
+            if not found:
+                for json_file in json_files:
+                    json_stem = Path(json_file).stem
+                    if json_stem == result_id or json_stem.startswith(result_id):
+                        filename = os.path.basename(json_file)
+                        file_path = os.path.join(directory, filename)
+                        break
+        
+        if os.path.exists(file_path):
             return send_from_directory(directory, filename, as_attachment=True)
         else:
-            return "Dosya bulunamadı", 404
+            print(f"[HATA] JSON dosyasi bulunamadi: result_id={result_id}, aradigi dosya={file_path}")
+            return f"Dosya bulunamadı: {result_id}", 404
     else:
         return "Sadece JSON indirilebilir", 400
 
