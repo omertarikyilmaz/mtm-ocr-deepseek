@@ -205,15 +205,20 @@ class MTMOCRProcessor:
     
     def extract_text_only(self, text: str) -> str:
         """
-        OCR çıktısından sadece metni çıkart
+        OCR çıktısından sadece metni çıkart (Free OCR veya Markdown için)
         """
+        # Eğer ref tag'leri varsa onları çıkar
         pattern = r'<\|ref\|>(.*?)<\|/ref\|>'
         matches = re.findall(pattern, text, re.DOTALL)
         
         if matches:
+            # Ref tag'lerinden metni al
             clean_text = ' '.join(match.strip() for match in matches if match.strip())
         else:
+            # Tag yok, direkt metni temizle
             clean_text = re.sub(r'<\|.*?\|>', '', text)
+            # Markdown karakterlerini temizle
+            clean_text = re.sub(r'[#*_`~\[\]]', '', clean_text)
             clean_text = re.sub(r'\n\n+', '\n\n', clean_text)
             clean_text = re.sub(r' +', ' ', clean_text)
         
@@ -330,8 +335,8 @@ class MTMOCRProcessor:
             # Default: 2 farklı prompt - biri tam metin, biri bbox
             if prompts is None:
                 prompts = [
-                    "<image>\nFree OCR.",                    # Prompt 1: Tüm metin (bbox YOK)
-                    "<image>\n<|grounding|>Free OCR."        # Prompt 2: Bbox'lar için
+                    "<image>\nFree OCR.",                                              # Prompt 1: Tüm metin (bbox YOK)
+                    "<image>\n<|grounding|>Convert the document to markdown."          # Prompt 2: Markdown + Bbox (daha detaylı)
                 ]
             
             # Her prompt için ayrı cache_item oluştur
@@ -569,17 +574,71 @@ class MTMOCRProcessor:
                 # Yüklenen görsel yolu (uploads klasöründeki orijinal)
                 original_upload_path = img_data['image_path']
                 
-                # ✅ BBOX'lari grounding output'undan al
-                print(f"[INFO] {image_filename}: Bbox'lar cikartiliyor (grounding output)...")
+                # ✅ TAM METNİ normal output'tan al (grounding olmayan)
+                print(f"[INFO] {image_filename}: Tam metin cikartiliyor (normal output)...")
+                clean_text = self.extract_text_only(ocr_text_full)  # Normal output kullan
+                
+                # ✅ BBOX'lari markdown output'undan al
+                print(f"[INFO] {image_filename}: Bbox'lar cikartiliyor (markdown grounding output)...")
                 word_positions = self.extract_word_positions(
-                    ocr_text_bbox,  # Grounding output'u kullan
+                    ocr_text_bbox,  # Markdown grounding output'u kullan
                     img_data['width'],
                     img_data['height']
                 )
                 
-                # ✅ TAM METNİ normal output'tan al (grounding olmayan)
-                print(f"[INFO] {image_filename}: Tam metin cikartiliyor (normal output)...")
-                clean_text = self.extract_text_only(ocr_text_full)  # Normal output kullan
+                # ✅ EĞER YETERLI BBOX YOKSA: Tam metinden kelime çıkar ve Locate ile ara
+                min_expected_words = len(clean_text.split()) * 0.5  # En az %50'si bulunmalı
+                if len(word_positions) < min_expected_words:
+                    print(f"[UYARI] {image_filename}: Sadece {len(word_positions)} bbox bulundu, {len(clean_text.split())} kelime var")
+                    print(f"[INFO] {image_filename}: Locate mode ile tum kelimelerin bbox'i aranacak...")
+                    
+                    # Tüm kelimeleri çıkar
+                    all_words = clean_text.split()
+                    all_words = [w.strip('.,!?;:()[]{}\"\'') for w in all_words if len(w.strip('.,!?;:()[]{}\"\'')) > 2]
+                    
+                    # Unique kelimeleri bul (Locate mode için)
+                    seen = set()
+                    unique_words = []
+                    for word in all_words:
+                        word_lower = word.lower()
+                        if word_lower not in seen:
+                            seen.add(word_lower)
+                            unique_words.append(word)
+                    
+                    print(f"[INFO] {image_filename}: {len(unique_words)} unique kelime icin Locate mode...")
+                    
+                    # Locate mode ile her kelimeyi bul (batch)
+                    word_locations = self.locate_words_in_image(
+                        img_data['image_path'],
+                        unique_words,
+                        batch_size=50  # Daha büyük batch
+                    )
+                    
+                    # Kelimeleri sırayla eşleştir
+                    word_positions = []
+                    bbox_usage_count = {}
+                    
+                    for idx, word_text in enumerate(all_words):
+                        word_lower = word_text.lower()
+                        if word_lower in word_locations:
+                            used_count = bbox_usage_count.get(word_lower, 0)
+                            bbox_list = word_locations[word_lower]
+                            
+                            if used_count < len(bbox_list):
+                                word_positions.append({
+                                    'text': word_text,
+                                    'bbox': bbox_list[used_count]['bbox'],
+                                    'index': idx,
+                                    'source': 'locate'  # Locate mode'dan geldi
+                                })
+                                bbox_usage_count[word_lower] = used_count + 1
+                    
+                    print(f"[INFO] {image_filename}: Locate mode'dan {len(word_positions)} kelime bbox'i bulundu")
+                else:
+                    print(f"[INFO] {image_filename}: Markdown output yeterli bbox verdi")
+                    # word_positions'a source ekle
+                    for wp in word_positions:
+                        wp['source'] = 'markdown'
                 
                 # Görseli base64 olarak oku - YUKLENEN GORSELI DIREKT AL
                 image_base64 = None
