@@ -310,38 +310,48 @@ class MTMOCRProcessor:
     def process_single_image(
         self,
         image_path: str,
-        prompt: str = "<image>\n<|grounding|>Free OCR.",
+        prompts: List[str] = None,
         use_word_location: bool = True
     ) -> Dict:
         """
-        Tek bir görseli işle
+        Tek bir görseli işle - ÇOKLU PROMPT DESTEĞİ
         
         Args:
             image_path: Görsel dosya yolu
-            prompt: OCR prompt
+            prompts: OCR prompt listesi (None ise default 2 prompt kullanır)
             
         Returns:
-            İşlem sonucu bilgileri
+            İşlem sonucu bilgileri (her prompt için cache_item içerir)
         """
         try:
             image = Image.open(image_path).convert('RGB')
             image_width, image_height = image.size
             
-            # Image processing
-            cache_item = {
-                "prompt": prompt,
-                "multi_modal_data": {
-                    "image": self.processor.tokenize_with_images(
-                        images=[image],
-                        bos=True,
-                        eos=True,
-                        cropping=self.crop_mode
-                    )
-                },
-            }
+            # Default: 2 farklı prompt - biri tam metin, biri bbox
+            if prompts is None:
+                prompts = [
+                    "<image>\nFree OCR.",                    # Prompt 1: Tüm metin (bbox YOK)
+                    "<image>\n<|grounding|>Free OCR."        # Prompt 2: Bbox'lar için
+                ]
+            
+            # Her prompt için ayrı cache_item oluştur
+            cache_items = []
+            for prompt in prompts:
+                cache_item = {
+                    "prompt": prompt,
+                    "multi_modal_data": {
+                        "image": self.processor.tokenize_with_images(
+                            images=[image],
+                            bos=True,
+                            eos=True,
+                            cropping=self.crop_mode
+                        )
+                    },
+                }
+                cache_items.append(cache_item)
             
             return {
-                'cache_item': cache_item,
+                'cache_items': cache_items,  # Liste olarak döndür
                 'image': image,
                 'image_path': image_path,
                 'width': image_width,
@@ -471,17 +481,21 @@ class MTMOCRProcessor:
     def process_batch(
         self,
         image_paths: List[str],
-        prompt: str = "<image>\n<|grounding|>Free OCR.",
+        prompts: List[str] = None,
         num_workers: int = 32,
         progress_callback: Optional[callable] = None,
         use_word_location: bool = False  # Free OCR bbox'larını kullan
     ) -> List[Dict]:
         """
-        Birden fazla görseli batch olarak işle
+        Birden fazla görseli batch olarak işle - ÇOKLU PROMPT DESTEĞİ
+        
+        Her görsel için 2 prompt işlenir:
+        1. Free OCR (grounding YOK) → Tam metin
+        2. Free OCR (grounding VAR) → Bbox'lar
         
         Args:
             image_paths: Görsel dosya yolları listesi
-            prompt: OCR prompt
+            prompts: OCR prompt listesi (None ise default 2 prompt)
             num_workers: Paralel işlem sayısı
             progress_callback: Progress güncellemesi için callback fonksiyonu
             
@@ -489,6 +503,7 @@ class MTMOCRProcessor:
             Tüm görseller için OCR sonuçları
         """
         print(f"\n[INFO] {len(image_paths)} gazete sayfasi isleniyor...")
+        print(f"[INFO] Her gorsel icin 2 prompt kullanilacak (tam metin + bbox)")
         
         if progress_callback:
             progress_callback(0, len(image_paths), "Gorseller hazirlaniyor")
@@ -498,7 +513,7 @@ class MTMOCRProcessor:
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
             processed_images = list(
                 executor.map(
-                    lambda p: self.process_single_image(p, prompt),
+                    lambda p: self.process_single_image(p, prompts),
                     image_paths
                 )
             )
@@ -509,10 +524,17 @@ class MTMOCRProcessor:
         if not processed_images:
             print("[HATA] Islenecek gorsel bulunamadi")
             return []
+        
         if progress_callback:
             progress_callback(0, len(processed_images), "OCR islemi yapiliyor")
-            
-        batch_inputs = [img['cache_item'] for img in processed_images]
+        
+        # Her görsel için 2 prompt var, hepsini tek batch'te işle
+        # batch_inputs: [img1_prompt1, img1_prompt2, img2_prompt1, img2_prompt2, ...]
+        batch_inputs = []
+        for img in processed_images:
+            batch_inputs.extend(img['cache_items'])  # 2 cache_item ekle
+        
+        print(f"[2/3] OCR batch isleniyor: {len(batch_inputs)} islem ({len(processed_images)} gorsel x 2 prompt)")
         
         outputs_list = self.llm.generate(
             batch_inputs,
@@ -521,15 +543,22 @@ class MTMOCRProcessor:
         
         if progress_callback:
             progress_callback(0, len(processed_images), "Sonuclar kaydediliyor")
-            
+        
+        print(f"[3/3] Sonuclar isleniyor...")
         results = []
         
-        for idx, (output, img_data) in enumerate(zip(outputs_list, processed_images)):
+        # Her görsel için 2 output var: [img1_text, img1_bbox, img2_text, img2_bbox, ...]
+        for idx, img_data in enumerate(processed_images):
             if progress_callback:
                 progress_callback(idx + 1, len(processed_images), f"Sonuc kaydediliyor ({idx+1}/{len(processed_images)})")
             try:
-                # OCR çıktısı
-                ocr_text = output.outputs[0].text
+                # Her görsel için 2 output al
+                output_text = outputs_list[idx * 2]       # Prompt 1: Tam metin
+                output_bbox = outputs_list[idx * 2 + 1]   # Prompt 2: Bbox'lar
+                
+                # İki ayrı OCR çıktısı
+                ocr_text_full = output_text.outputs[0].text      # Tam metin (grounding yok)
+                ocr_text_bbox = output_bbox.outputs[0].text      # Bbox'larla metin (grounding var)
                 
                 # Dosya adı (benzersiz ID'den)
                 image_path_obj = Path(img_data['image_path'])
@@ -540,15 +569,17 @@ class MTMOCRProcessor:
                 # Yüklenen görsel yolu (uploads klasöründeki orijinal)
                 original_upload_path = img_data['image_path']
                 
-                # Kelime pozisyonlarını çıkart
+                # ✅ BBOX'lari grounding output'undan al
+                print(f"[INFO] {image_filename}: Bbox'lar cikartiliyor (grounding output)...")
                 word_positions = self.extract_word_positions(
-                    ocr_text,
+                    ocr_text_bbox,  # Grounding output'u kullan
                     img_data['width'],
                     img_data['height']
                 )
                 
-                # Temiz metni çıkart
-                clean_text = self.extract_text_only(ocr_text)
+                # ✅ TAM METNİ normal output'tan al (grounding olmayan)
+                print(f"[INFO] {image_filename}: Tam metin cikartiliyor (normal output)...")
+                clean_text = self.extract_text_only(ocr_text_full)  # Normal output kullan
                 
                 # Görseli base64 olarak oku - YUKLENEN GORSELI DIREKT AL
                 image_base64 = None
@@ -567,72 +598,11 @@ class MTMOCRProcessor:
                     import traceback
                     print(traceback.format_exc())
                 
-                # Free OCR genelde pozisyonları eksik verir
-                # Her kelime için Locate (REC) mode kullan - DAHA DOĞRU
-                print(f"[INFO] Free OCR'dan {len(word_positions)} kelime pozisyonu bulundu")
+                # Artık 2 farklı prompt kullanıyoruz, sonuçlar daha iyi!
+                print(f"[INFO] {image_filename}: {len(word_positions)} kelime bbox'i bulundu")
+                print(f"[INFO] {image_filename}: Tam metin uzunlugu: {len(clean_text)} karakter")
                 
-                if use_word_location:
-                    # Tüm kelimeleri çıkar
-                    all_words = clean_text.split()
-                    all_words = [w.strip('.,!?;:()[]{}\"\'') for w in all_words if len(w.strip('.,!?;:()[]{}\"\'')) > 0]
-                    
-                    # Unique kelimeleri bul
-                    seen = set()
-                    unique_words = []
-                    for word in all_words:
-                        word_lower = word.lower()
-                        if word_lower not in seen and len(word) > 1:  # Tek harfleri atla
-                            seen.add(word_lower)
-                            unique_words.append(word)
-                    
-                    print(f"[INFO] Locate mode ile {len(unique_words)} unique kelime aranacak...")
-                    
-                    # Her kelime için Locate mode ile pozisyon bul
-                    word_locations = self.locate_words_in_image(
-                        img_data['image_path'], 
-                        unique_words, 
-                        batch_size=10  # Daha küçük batch
-                    )
-                    
-                    print(f"[INFO] Locate mode'dan {len(word_locations)} kelime pozisyonu bulundu")
-                    
-                    # DEBUG: İlk 3 kelimenin bbox'larını göster
-                    if word_locations:
-                        print(f"[DEBUG] İlk 3 kelime lokasyonu:")
-                        for word, bbox_list in list(word_locations.items())[:3]:
-                            print(f"  '{word}': {len(bbox_list)} bbox bulundu")
-                            for i, bbox_data in enumerate(bbox_list[:2]):  # İlk 2 bbox'ı göster
-                                print(f"    [{i+1}] {bbox_data['bbox']}")
-                    else:
-                        print(f"[UYARI] Locate mode hiç kelime bulamadı! Free OCR bbox'ları kullanılacak.")
-                    
-                    # ✅ FIX: Çoklu bbox desteği - her kelime tekrarı için sıradaki bbox'ı kullan
-                    word_positions = []
-                    bbox_usage_count = {}  # Her kelime için kaç bbox kullandığımızı takip et
-                    
-                    for idx, word_text in enumerate(all_words):
-                        word_lower = word_text.lower()
-                        if word_lower in word_locations:
-                            # Bu kelimenin kaçıncı tekrarı?
-                            used_count = bbox_usage_count.get(word_lower, 0)
-                            bbox_list = word_locations[word_lower]
-                            
-                            # Eğer bu tekrar için bbox varsa kullan
-                            if used_count < len(bbox_list):
-                                word_positions.append({
-                                    'text': word_text,
-                                    'bbox': bbox_list[used_count]['bbox'],
-                                    'index': idx,
-                                    'occurrence': used_count + 1  # Kaçıncı tekrar olduğunu belirt
-                                })
-                                bbox_usage_count[word_lower] = used_count + 1
-                            else:
-                                # Bbox kalmadı, bu tekrarı atla veya uyarı ver
-                                if used_count == len(bbox_list):  # İlk kez bbox bittiğinde uyar
-                                    print(f"[UYARI] '{word_text}' için {len(bbox_list)} bbox var ama {used_count+1}. tekrar isteniyor")
-                                bbox_usage_count[word_lower] = used_count + 1
-                
-                # JSON sonuç
+                # JSON sonuç - Her iki output'u da sakla (debug için faydalı)
                 result_data = {
                     'image_id': image_id,
                     'image_filename': image_filename,
@@ -644,8 +614,9 @@ class MTMOCRProcessor:
                     },
                     'word_count': len(word_positions),
                     'words': word_positions,
-                    'full_text': clean_text,
-                    'raw_ocr_output': ocr_text,
+                    'full_text': clean_text,  # Normal Free OCR'dan (tam metin)
+                    'raw_ocr_output_text': ocr_text_full,  # Normal Free OCR çıktısı
+                    'raw_ocr_output_bbox': ocr_text_bbox,  # Grounding Free OCR çıktısı
                     'image_base64': image_base64
                 }
                 
