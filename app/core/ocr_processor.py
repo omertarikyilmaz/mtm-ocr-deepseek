@@ -106,6 +106,17 @@ class MTMOCRProcessor:
         total_time = time.time() - start_time
         print(f"[INFO] Model yukleme tamamlandi ({total_time:.1f} saniye)")
     
+    def extract_grounding_references(self, text: str) -> List[Tuple]:
+        """
+        OCR çıktısından grounding references'ları çıkart (kaynak koddan)
+        Pattern: <|ref|>label<|/ref|><|det|>coords<|/det|>
+        
+        Returns:
+            List of tuples: (full_match, label, coords_str)
+        """
+        pattern = r'(<\|ref\|>(.*?)<\|/ref\|><\|det\|>(.*?)<\|/det\|>)'
+        return re.findall(pattern, text, re.DOTALL)
+    
     def extract_word_positions(
         self, 
         text: str, 
@@ -114,9 +125,10 @@ class MTMOCRProcessor:
     ) -> List[Dict]:
         """
         OCR çıktısından kelimelerin pozisyonlarını çıkart
+        Kaynak koddan esinlenilmiş: extract_grounding_references + normalize to pixel
         
         Args:
-            text: OCR çıktı metni
+            text: OCR çıktı metni (<|grounding|> tag'li Free OCR response)
             image_width: Görsel genişliği
             image_height: Görsel yüksekliği
             
@@ -125,75 +137,50 @@ class MTMOCRProcessor:
         """
         word_positions = []
         
-        # GROUNDING TAG OLMADAN: Modelin kendi formatını kontrol et
-        # Bazen markdown format döndürür, bazen düz metin
+        # Grounding references'ları çıkar (kaynak koddan)
+        refs = self.extract_grounding_references(text)
         
-        # DEBUG: Free OCR response'un başını göster
-        print(f"[DEBUG FREE OCR] Response uzunluğu: {len(text)} karakter")
-        print(f"[DEBUG FREE OCR] İlk 500 karakter: {text[:500]}")
-        
-        # Format 1: <|ref|>text<|/ref|><|det|>coords<|/det|>
-        pattern1 = r'<\|ref\|>(.*?)<\|/ref\|><\|det\|>(.*?)<\|/det\|>'
-        matches1 = re.findall(pattern1, text, re.DOTALL)
-        
-        # Format 2: <|ref|>text<|/ref|><|box|>coords<|/box|>
-        pattern2 = r'<\|ref\|>(.*?)<\|/ref\|><\|box\|>(.*?)<\|/box\|>'
-        matches2 = re.findall(pattern2, text, re.DOTALL)
-        
-        # Hangisi daha fazla sonuç veriyorsa onu kullan
-        if len(matches1) > 0:
-            matches = matches1
-            format_name = "det"
-            print(f"[DEBUG FREE OCR] {len(matches1)} adet <|det|> match bulundu")
-        elif len(matches2) > 0:
-            matches = matches2
-            format_name = "box"
-            print(f"[DEBUG FREE OCR] {len(matches2)} adet <|box|> match bulundu")
-        else:
-            matches = []
-            format_name = "none"
-            print(f"[DEBUG FREE OCR] Hiç bbox match bulunamadı!")
-        
-        if format_name == "none":
+        if not refs:
+            print(f"[UYARI] Hiç bbox bulunamadı! Response uzunluğu: {len(text)} karakter")
+            print(f"[UYARI] İlk 300 karakter: {text[:300]}")
             return []
         
-        for idx, (word_text, coordinates_str) in enumerate(matches):
+        print(f"[INFO] {len(refs)} adet kelime bbox'ı bulundu")
+        
+        # Her ref için: (full_match, label, coords_str)
+        for idx, (full_match, label, coords_str) in enumerate(refs):
             try:
-                # Koordinatları parse et (güvenli)
+                # Koordinatları parse et (güvenli - kaynak kodda eval() var)
                 import ast
-                coordinates = ast.literal_eval(coordinates_str)
+                coordinates = ast.literal_eval(coords_str)
                 
                 # Liste içinde liste varsa düzleştir
                 if isinstance(coordinates, list):
                     if len(coordinates) > 0 and isinstance(coordinates[0], list):
-                        # [[x1,y1,x2,y2]] formatı
+                        # [[x1,y1,x2,y2]] veya [[x1,y1,x2,y2], ...] formatı
                         bbox_list = coordinates
                     else:
-                        # [x1,y1,x2,y2] formatı
+                        # [x1,y1,x2,y2] formatı - tek bbox
                         bbox_list = [coordinates]
                     
+                    # Her bbox için pixel koordinatlarına çevir (kaynak koddan)
                     for bbox in bbox_list:
                         if len(bbox) >= 4:
                             x1, y1, x2, y2 = bbox[:4]
                             
-                            # DEBUG: İlk 3 kelime için bbox'ları göster
-                            if idx < 3:
-                                print(f"[DEBUG FREE OCR] '{word_text}' normalize bbox: {bbox}")
-                            
                             # DeepSeek OCR HER ZAMAN 0-999 arası normalize döndürür!
-                            # Resmi kod: x1 = int(x1 / 999 * image_width)
-                            # modeling_deepseekocr.py satır 104-108
+                            # Kaynak kod: int(box[0]/999*img_w)
                             pixel_x1 = int(x1 / 999 * image_width)
                             pixel_y1 = int(y1 / 999 * image_height)
                             pixel_x2 = int(x2 / 999 * image_width)
                             pixel_y2 = int(y2 / 999 * image_height)
                             
-                            # DEBUG: İlk 3 kelime için pixel bbox'ları göster
+                            # DEBUG: İlk 3 kelime
                             if idx < 3:
-                                print(f"[DEBUG FREE OCR] '{word_text}' pixel bbox: x1={pixel_x1}, y1={pixel_y1}, x2={pixel_x2}, y2={pixel_y2}, w={pixel_x2-pixel_x1}, h={pixel_y2-pixel_y1}")
+                                print(f"[DEBUG] '{label}' - normalize: {bbox}, pixel: ({pixel_x1},{pixel_y1},{pixel_x2},{pixel_y2})")
                             
                             word_positions.append({
-                                'text': word_text.strip(),
+                                'text': label.strip(),
                                 'bbox': {
                                     'x1': pixel_x1,
                                     'y1': pixel_y1,
@@ -211,6 +198,7 @@ class MTMOCRProcessor:
                                 'index': idx
                             })
             except Exception as e:
+                print(f"[UYARI] Bbox parse hatası (idx={idx}): {e}")
                 continue
         
         return word_positions
@@ -238,11 +226,11 @@ class MTMOCRProcessor:
         output_path: str,
         show_text: bool = True,
         box_color: tuple = None,
-        box_width: int = 2
+        box_width: int = 3
     ) -> Image.Image:
         """
         JSON'dan alınan kelime pozisyonlarını görsel üzerinde göster
-        DeepSeek'ten bağımsız, kendi kutu çizme sistemimiz
+        Kaynak koddan esinlenilmiş gelişmiş bbox çizimi (overlay + label desteği)
         
         Args:
             image_path: Orijinal görsel yolu
@@ -257,40 +245,72 @@ class MTMOCRProcessor:
         """
         image = Image.open(image_path).convert('RGB')
         img_draw = image.copy()
-        draw = ImageDraw.Draw(img_draw, 'RGBA')
+        draw = ImageDraw.Draw(img_draw)
+        
+        # Overlay için şeffaf layer (kaynak koddan)
+        overlay = Image.new('RGBA', img_draw.size, (0, 0, 0, 0))
+        draw2 = ImageDraw.Draw(overlay)
         
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
         except:
             font = ImageFont.load_default()
+        
+        # Her kelime için renk map (kaynak koddan)
+        color_map = {}
+        np.random.seed(42)
         
         for idx, word_info in enumerate(word_positions):
             try:
                 bbox = word_info['bbox']
                 text = word_info.get('text', '')
                 
-                if box_color:
-                    color = box_color
-                else:
-                    hue = (idx * 137.5) % 360
-                    import colorsys
-                    rgb = colorsys.hsv_to_rgb(hue/360, 0.7, 0.9)
-                    color = tuple(int(c * 255) for c in rgb)
+                # Kelimeye göre tutarlı renk ata
+                if text not in color_map:
+                    if box_color:
+                        color_map[text] = box_color
+                    else:
+                        color_map[text] = (
+                            np.random.randint(50, 255),
+                            np.random.randint(50, 255),
+                            np.random.randint(50, 255)
+                        )
+                
+                color = color_map[text]
+                color_a = color + (60,)  # Alpha channel için şeffaflık
                 
                 x1, y1 = bbox['x1'], bbox['y1']
                 x2, y2 = bbox['x2'], bbox['y2']
+                
+                # Kutu çiz (outline)
                 draw.rectangle([x1, y1, x2, y2], outline=color, width=box_width)
+                
+                # Şeffaf dolgu (kaynak koddan)
+                draw2.rectangle([x1, y1, x2, y2], fill=color_a)
+                
+                # Label çiz (eğer show_text True ise)
+                if show_text and text:
+                    text_bbox = draw.textbbox((0, 0), text, font=font)
+                    tw, th = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
+                    ty = max(0, y1 - 20)
+                    
+                    # Label arkaplanı
+                    draw.rectangle([x1, ty, x1 + tw + 4, ty + th + 4], fill=color)
+                    # Label metni (beyaz)
+                    draw.text((x1 + 2, ty + 2), text, font=font, fill=(255, 255, 255))
                 
             except Exception as e:
                 continue
         
+        # Overlay'i ana görsele yapıştır (kaynak koddan)
+        img_draw.paste(overlay, (0, 0), overlay)
         img_draw.save(output_path, quality=95)
         return img_draw
     
     def process_single_image(
         self,
         image_path: str,
-        prompt: str = "<image>\nFree OCR.",
+        prompt: str = "<image>\n<|grounding|>Free OCR.",
         use_word_location: bool = True
     ) -> Dict:
         """
@@ -451,7 +471,7 @@ class MTMOCRProcessor:
     def process_batch(
         self,
         image_paths: List[str],
-        prompt: str = "<image>\nFree OCR.",
+        prompt: str = "<image>\n<|grounding|>Free OCR.",
         num_workers: int = 32,
         progress_callback: Optional[callable] = None,
         use_word_location: bool = False  # Free OCR bbox'larını kullan
