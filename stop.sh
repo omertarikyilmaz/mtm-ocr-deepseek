@@ -11,7 +11,7 @@ echo "========================================"
 echo ""
 
 # Docker Compose ile durdur
-docker-compose down
+docker compose down
 
 echo ""
 echo "========================================"

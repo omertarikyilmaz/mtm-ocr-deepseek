@@ -25,7 +25,7 @@ mtm-ocr-deepseek/
 
 ### Gereksinimler
 
-- Docker & Docker Compose
+- Docker (v20.10+) with Compose plugin
 - NVIDIA GPU (CUDA 12.1 uyumlu)
 - NVIDIA Docker Runtime
 
@@ -53,10 +53,10 @@ cd mtm-ocr-deepseek
 ./update.sh
 
 # Logları görüntüle
-docker-compose logs -f
+docker compose logs -f
 
 # Tek bir servisin logları
-docker-compose logs -f deepseek
+docker compose logs -f deepseek
 ```
 
 ## 🌐 Erişim
@@ -126,16 +126,16 @@ DELETE /api/delete-all
 ### Tek bir servisi yeniden build et
 
 ```bash
-docker-compose build backend
-docker-compose build frontend
-docker-compose build deepseek
+docker compose build backend
+docker compose build frontend
+docker compose build deepseek
 ```
 
 ### Container'a gir
 
 ```bash
-docker-compose exec backend bash
-docker-compose exec deepseek bash
+docker compose exec backend bash
+docker compose exec deepseek bash
 ```
 
 ### Model önbelleğini temizle
@@ -156,10 +156,10 @@ rm -rf models/*
 
 ```bash
 # DeepSeek servisini yeniden başlat
-docker-compose restart deepseek
+docker compose restart deepseek
 
 # Logları kontrol et
-docker-compose logs -f deepseek
+docker compose logs -f deepseek
 ```
 
 ### GPU erişim hatası
@@ -169,7 +169,7 @@ docker-compose logs -f deepseek
 docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
 
 # Docker Compose GPU desteği
-docker-compose config | grep -A 5 "devices"
+docker compose config | grep -A 5 "devices"
 ```
 
 ### Port çakışması

@@ -30,7 +30,7 @@ git pull origin main
 
 # Docker build (başlatmadan)
 echo "[3/3] Docker imajları build ediliyor..."
-docker-compose build
+docker compose build
 
 echo ""
 echo "========================================"
