@@ -1,29 +1,29 @@
 /**
- * MTM OCR - OCR İşleme Modülü
- * Gazete yükleme ve OCR işlemleri
+ * MTM OCR Frontend - Basit OCR İşleme
+ * Bbox mantığı kaldırılmış, sadece metin işleme
  */
 
+const API_BASE = '/api';
 let uploadedFiles = [];
 let processingInterval = null;
 
-/**
- * Sayfa yüklendiğinde
- */
+// Sayfa yüklendiğinde
 document.addEventListener('DOMContentLoaded', () => {
-    initOCRModule();
+    initApp();
     loadResults();
 });
 
 /**
- * OCR modülünü başlat
+ * Uygulamayı başlat
  */
-function initOCRModule() {
+function initApp() {
     const uploadZone = document.getElementById('uploadZone');
     const fileInput = document.getElementById('fileInput');
     const clearBtn = document.getElementById('clearBtn');
     const processBtn = document.getElementById('processBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     const deleteAllBtn = document.getElementById('deleteAllBtn');
+    const modalClose = document.getElementById('modalClose');
     
     // Upload zone events
     uploadZone.addEventListener('click', () => fileInput.click());
@@ -52,6 +52,7 @@ function initOCRModule() {
     processBtn.addEventListener('click', processImages);
     refreshBtn.addEventListener('click', loadResults);
     deleteAllBtn.addEventListener('click', deleteAllResults);
+    modalClose.addEventListener('click', closeModal);
 }
 
 /**
@@ -65,7 +66,7 @@ async function handleFiles(files) {
     }
     
     try {
-        const response = await fetch('/upload', {
+        const response = await fetch(`${API_BASE}/upload`, {
             method: 'POST',
             body: formData
         });
@@ -141,7 +142,7 @@ async function processImages() {
         progressFill.style.width = '0%';
         progressFill.textContent = '0%';
         
-        const response = await fetch('/process', {
+        const response = await fetch(`${API_BASE}/process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filenames })
@@ -171,10 +172,10 @@ function startStatusPolling() {
     
     processingInterval = setInterval(async () => {
         try {
-            const response = await fetch('/status');
+            const response = await fetch(`${API_BASE}/status`);
             const status = await response.json();
             
-            statusMessage.textContent = status.status_message;
+            statusMessage.textContent = status.status_message || 'İşleniyor...';
             
             if (status.total > 0) {
                 const progress = Math.round((status.progress / status.total) * 100);
@@ -200,7 +201,7 @@ async function loadResults() {
     const resultsGrid = document.getElementById('resultsGrid');
     
     try {
-        const response = await fetch('/results');
+        const response = await fetch(`${API_BASE}/results`);
         const data = await response.json();
         
         if (data.results.length === 0) {
@@ -215,7 +216,7 @@ async function loadResults() {
                 <div class="result-info">
                     <div class="result-title">${result.filename}</div>
                     <div class="result-meta">
-                        <span>${result.word_count} kelime</span>
+                        <span>${result.text_length} karakter</span>
                         <span>${result.timestamp}</span>
                     </div>
                     <div class="result-actions">
@@ -240,33 +241,38 @@ async function showResult(resultId) {
     const modalBody = document.getElementById('modalBody');
     
     try {
-        const response = await fetch(`/result/${resultId}`);
+        const response = await fetch(`${API_BASE}/result/${resultId}`);
         const data = await response.json();
         
         modalTitle.textContent = data.image_filename;
         
+        // Görseli base64'ten göster
+        let imageHtml = '';
+        if (data.image_base64) {
+            const imgSrc = data.image_base64.startsWith('data:') 
+                ? data.image_base64 
+                : `data:image/jpeg;base64,${data.image_base64}`;
+            imageHtml = `
+                <div class="modal-section">
+                    <h3>Görsel</h3>
+                    <img src="${imgSrc}" style="max-width: 100%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+                </div>
+            `;
+        }
+        
         modalBody.innerHTML = `
             <h3 style="margin-bottom: 15px;">İstatistikler</h3>
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <p><strong>Toplam Kelime:</strong> ${data.word_count}</p>
+                <p><strong>Metin Uzunluğu:</strong> ${data.text.length} karakter</p>
                 <p><strong>Görsel Boyutu:</strong> ${data.image_size.width} x ${data.image_size.height} px</p>
                 <p><strong>Tarih:</strong> ${data.timestamp}</p>
             </div>
             
+            ${imageHtml}
+            
             <h3 style="margin-bottom: 15px;">OCR Metni</h3>
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; margin-bottom: 20px; font-family: monospace;">
-                ${data.full_text}
-            </div>
-            
-            <h3 style="margin-bottom: 15px;">Kelime Pozisyonları (İlk 100)</h3>
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px;">
-                ${data.words.slice(0, 100).map(word => `
-                    <div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px;">
-                        <strong>"${word.text}"</strong><br>
-                        <span style="color: #666;">Pozisyon: x=${word.bbox.x1}, y=${word.bbox.y1}, w=${word.bbox.width}, h=${word.bbox.height}</span>
-                    </div>
-                `).join('')}
-                ${data.words.length > 100 ? `<p style="text-align: center; color: #999; margin-top: 15px;">... ve ${data.words.length - 100} kelime daha</p>` : ''}
+                ${data.text}
             </div>
         `;
         
@@ -277,10 +283,17 @@ async function showResult(resultId) {
 }
 
 /**
+ * Modal'ı kapat
+ */
+function closeModal() {
+    document.getElementById('resultModal').classList.remove('active');
+}
+
+/**
  * JSON dosyasını indir
  */
 function downloadFile(resultId) {
-    window.location.href = `/api/download/${resultId}`;
+    window.location.href = `${API_BASE}/download/${resultId}`;
 }
 
 /**
@@ -292,7 +305,7 @@ async function deleteResult(resultId) {
     }
     
     try {
-        const response = await fetch(`/delete/${resultId}`, { method: 'DELETE' });
+        const response = await fetch(`${API_BASE}/delete/${resultId}`, { method: 'DELETE' });
         const data = await response.json();
         
         if (data.success) {
@@ -314,7 +327,7 @@ async function deleteAllResults() {
     }
     
     try {
-        const response = await fetch('/delete-all', { method: 'DELETE' });
+        const response = await fetch(`${API_BASE}/delete-all`, { method: 'DELETE' });
         const data = await response.json();
         
         if (data.success) {

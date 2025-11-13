@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Backend - Flask API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: mtm-ocr-backend:latest
+    container_name: mtm-ocr-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./output:/app/output
+    networks:
+      - mtm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend - Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: mtm-ocr-frontend:latest
+    container_name: mtm-ocr-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - mtm-network
+
+  # DeepSeek - OCR Servisi (GPU)
+  deepseek:
+    build:
+      context: ./deepseek
+      dockerfile: Dockerfile
+    image: mtm-ocr-deepseek:latest
+    container_name: mtm-ocr-deepseek
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
+      - VLLM_USE_V1=0
+    volumes:
+      - ./uploads:/app/uploads
+      - ./output:/app/output
+      - ./models:/root/.cache/huggingface
+    shm_size: '8gb'
+    networks:
+      - mtm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+networks:
+  mtm-network:
+    driver: bridge
+
+volumes:
+  models:
+  uploads:
+  output:
+

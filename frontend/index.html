@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTM OCR - Medya Takip Merkezi</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📄 MTM OCR</h1>
+            <p>Gazete sayfalarınızı analiz edin</p>
+        </div>
+        
+        <!-- Upload Section -->
+        <div class="card">
+            <h2>Gazete Yükle</h2>
+            
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">Gazete sayfalarını buraya sürükleyin</div>
+                <div class="upload-hint">veya tıklayarak dosya seçin (JPG, JPEG, PNG)</div>
+            </div>
+            
+            <input type="file" id="fileInput" multiple accept="image/jpeg,image/jpg,image/png" class="hidden">
+            
+            <div id="fileList" class="file-list"></div>
+            
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button class="btn" id="processBtn" disabled>OCR İşlemini Başlat</button>
+                <button class="btn btn-secondary" id="clearBtn" disabled>Temizle</button>
+            </div>
+            
+            <div id="statusBox" class="status-box">
+                <div id="statusMessage">İşlem bekleniyor...</div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill">0%</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2>İşlenmiş Gazeteler</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" id="refreshBtn">Yenile</button>
+                    <button class="btn btn-danger" id="deleteAllBtn">Tümünü Sil</button>
+                </div>
+            </div>
+            <div id="resultsGrid" class="results-grid"></div>
+        </div>
+    </div>
+    
+    <!-- Result Modal -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button class="modal-close" id="modalClose">×</button>
+                <h2 id="modalTitle">Sonuç Detayları</h2>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+    
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+
