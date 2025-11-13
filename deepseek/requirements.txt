@@ -13,8 +13,9 @@ torchaudio==2.4.0
 vllm==0.8.5
 
 # Transformers ve Tokenizers
-transformers==4.46.3
-tokenizers==0.20.3
+# vLLM 0.8.5 requires transformers>=4.51.1
+transformers>=4.51.1
+tokenizers>=0.20.3
 
 # PDF ve Image işleme
 PyMuPDF
